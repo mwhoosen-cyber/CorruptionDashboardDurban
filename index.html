@@ -1,0 +1,3298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The eThekwini Reckoning — Accountability Dashboard</title>
+<meta name="description" content="A public accountability dashboard tracking verified corruption cases and governance failures in the eThekwini Metro." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+  /* Set theme before first paint to avoid a flash of the wrong mode. */
+  (function () {
+    try {
+      var stored = localStorage.getItem('er-theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>
+
+<style>
+:root {
+  /* Brand + semantic palette (light) — names kept stable so all
+     downstream rules theme automatically when these values flip. */
+  --primary: #0A4DA2;
+  --primary-dark: #073A7D;
+  --accent: #E9F1FC;
+  --danger: #C0392B;
+  --warning: #DC7A23;
+  --success: #1E7A46;
+  --gold: #B6892E;
+  --mk: #DC7A23;
+
+  --neutral-dark: #0E1B30;   /* primary text in light */
+  --neutral-mid: #52617B;    /* secondary text */
+  --neutral-light: #F5F8FC;  /* page bg / insets / thead */
+  --white: #FFFFFF;          /* card / surface */
+  --border: #E2E8F2;
+
+  /* Extra surface tokens */
+  --bg: #F4F7FC;
+  --surface: #FFFFFF;
+  --surface-2: #F1F5FB;
+  --ink-faint: #8B97AD;
+  --footer-bg: #0B1830;
+  --btn-bg: #0A4DA2;
+  --btn-fg: #FFFFFF;
+
+  /* Data-viz tokens (read by Chart.js at render time) */
+  --dv-anc: #16233B;
+  --dv-mk: #DC7A23;
+  --dv-blue: #0A4DA2;
+  --dv-red: #C0392B;
+  --dv-grid: rgba(14,27,48,0.08);
+  --dv-text: #52617B;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-4xl: 2.25rem;
+  --text-6xl: 3.75rem;
+
+  --shadow-sm: 0 1px 2px rgba(16,30,54,.05), 0 1px 3px rgba(16,30,54,.04);
+  --shadow-md: 0 6px 18px rgba(16,30,54,.08);
+  --shadow-lg: 0 20px 50px rgba(16,30,54,.14);
+  --shadow-brand: 0 10px 28px rgba(10,77,162,.20);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  --maxw: 1200px;
+  --ease: cubic-bezier(.4,0,.2,1);
+}
+
+[data-theme="dark"] {
+  --primary: #5A95F0;
+  --primary-dark: #8FB7FF;
+  --accent: #16243E;
+  --danger: #FF7062;
+  --warning: #EFA052;
+  --success: #4ADE80;
+  --gold: #D8B45A;
+  --mk: #F0974A;
+
+  --neutral-dark: #E8EEF8;   /* primary text in dark */
+  --neutral-mid: #A6B3C9;
+  --neutral-light: #0E1626;  /* dark inset / thead */
+  --white: #121C2E;          /* dark card / surface */
+  --border: #243349;
+
+  --bg: #080D17;
+  --surface: #121C2E;
+  --surface-2: #18243A;
+  --ink-faint: #6C7C98;
+  --footer-bg: #060B16;
+  --btn-bg: #2E6FD6;
+  --btn-fg: #FFFFFF;
+
+  --dv-anc: #C3CEE0;
+  --dv-mk: #F0974A;
+  --dv-blue: #5A95F0;
+  --dv-red: #FF7062;
+  --dv-grid: rgba(233,238,247,0.10);
+  --dv-text: #A6B3C9;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 8px 22px rgba(0,0,0,.45);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+  --shadow-brand: 0 10px 28px rgba(0,0,0,.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--neutral-light);
+  color: var(--neutral-dark);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === Top brand bar === */
+.brand-strip { height: 4px; background: var(--primary); }
+
+/* === Navigation === */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.nav-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+}
+.nav-brand {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 1.05rem;
+  color: var(--primary);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+.nav-links { display: flex; gap: 22px; align-items: center; }
+.nav-links a {
+  color: var(--neutral-dark);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.92rem;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--primary); }
+.nav-toggle {
+  display: none; background: none; border: none; cursor: pointer;
+  width: 36px; height: 36px; padding: 6px;
+}
+.nav-toggle span {
+  display: block; width: 100%; height: 2px; background: var(--neutral-dark);
+  margin: 5px 0; transition: 0.2s;
+}
+
+/* === Hero === */
+.hero {
+  background: linear-gradient(180deg, var(--white) 0%, var(--accent) 100%);
+  padding: 60px 20px 40px;
+  border-bottom: 1px solid var(--border);
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  color: var(--primary-dark);
+  line-height: 1.1;
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+.hero-tag {
+  font-size: var(--text-lg);
+  color: var(--neutral-mid);
+  max-width: 700px;
+  margin-bottom: 36px;
+}
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+  background: var(--primary);
+}
+.stat-card .stat-num {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: clamp(2rem, 6vw, var(--text-6xl));
+  color: var(--primary-dark);
+  line-height: 1;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+.stat-card .stat-label {
+  font-size: var(--text-sm);
+  color: var(--neutral-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.hero-sub {
+  font-style: italic;
+  color: var(--neutral-mid);
+  font-size: var(--text-base);
+  border-left: 3px solid var(--primary);
+  padding-left: 16px;
+  margin-bottom: 28px;
+  max-width: 720px;
+}
+.party-pills {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.pill {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  color: var(--neutral-dark);
+  padding: 10px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.pill:hover { border-color: var(--primary); color: var(--primary); }
+.pill.active {
+  background: var(--primary); border-color: var(--primary); color: var(--white);
+}
+
+/* === Sections === */
+section { padding: 56px 20px; }
+.section-inner { max-width: 1280px; margin: 0 auto; }
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: var(--text-2xl);
+  color: var(--primary-dark);
+  margin-bottom: 6px;
+}
+.section-sub {
+  color: var(--neutral-mid);
+  font-size: var(--text-base);
+  margin-bottom: 28px;
+}
+
+/* === Filter bar === */
+.filter-bar {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
+}
+.filter-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-group label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--neutral-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.filter-group input,
+.filter-group select {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--neutral-dark);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.filter-group input:focus,
+.filter-group select:focus { border-color: var(--primary); }
+.filter-year-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+.year-slider-wrap { display: flex; align-items: center; gap: 12px; }
+.year-slider-wrap input[type=range] { flex: 1; accent-color: var(--primary); }
+.year-display { font-family: 'JetBrains Mono', monospace; font-size: var(--text-sm); color: var(--neutral-mid); }
+.result-count {
+  font-size: var(--text-sm);
+  color: var(--neutral-mid);
+  font-weight: 500;
+}
+.result-count strong { color: var(--primary-dark); }
+.active-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; min-height: 0;
+}
+.chip {
+  background: var(--accent);
+  color: var(--primary-dark);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+}
+.chip:hover { background: var(--primary); color: var(--white); }
+.chip::after { content: '×'; font-weight: 700; }
+
+/* === Summary cards === */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.summary-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.summary-card .sc-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-mid);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.summary-card .sc-value {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 1.7rem;
+  color: var(--primary-dark);
+  margin-bottom: 6px;
+  line-height: 1.1;
+}
+.summary-card .sc-note {
+  font-size: var(--text-xs);
+  color: var(--neutral-mid);
+}
+.sc-note .up { color: var(--danger); font-weight: 600; }
+.sc-note .down { color: #2c7a3e; font-weight: 600; }
+
+/* === Charts === */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.chart-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+}
+.chart-card h3 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: var(--text-lg);
+  color: var(--primary-dark);
+  margin-bottom: 4px;
+}
+.chart-card .chart-note {
+  font-size: var(--text-xs);
+  color: var(--neutral-mid);
+  font-style: italic;
+  margin-bottom: 14px;
+}
+.chart-wrap {
+  position: relative;
+  height: 280px;
+}
+
+/* === Table === */
+.table-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px; gap: 12px; flex-wrap: wrap;
+}
+.btn {
+  font-family: inherit;
+  background: var(--primary);
+  color: var(--white);
+  border: none;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn.secondary { background: var(--white); color: var(--primary); border: 1.5px solid var(--primary); }
+.btn.secondary:hover { background: var(--accent); }
+
+.table-wrap {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+thead {
+  background: var(--neutral-light);
+  border-bottom: 2px solid var(--border);
+}
+th {
+  text-align: left;
+  padding: 14px 12px;
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--neutral-mid);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+th:hover { color: var(--primary); }
+th .sort-arrow { display: inline-block; margin-left: 4px; opacity: 0.4; }
+th.sorted-asc .sort-arrow,
+th.sorted-desc .sort-arrow { opacity: 1; color: var(--primary); }
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+tbody tr:hover { background: var(--accent); }
+td { padding: 14px 12px; vertical-align: top; }
+td.case-id { font-family: 'JetBrains Mono', monospace; font-size: var(--text-xs); color: var(--neutral-mid); }
+td.rand { font-family: 'JetBrains Mono', monospace; font-weight: 600; white-space: nowrap; }
+td.individual .role {
+  display: block; font-size: var(--text-xs); color: var(--neutral-mid); margin-top: 2px;
+}
+td.sources a {
+  color: var(--primary); margin-right: 4px; text-decoration: none; font-size: var(--text-base);
+}
+td.sources a:hover { color: var(--primary-dark); }
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-anc { background: #1A1A2E; color: white; }
+.badge-mk { background: var(--warning); color: white; }
+.badge-type {
+  background: var(--accent); color: var(--primary-dark);
+  font-size: 0.7rem;
+  padding: 3px 8px;
+}
+.badge-scope {
+  display: inline-block;
+  background: #f4e9dc;
+  color: #8a5a1c;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.badge-scope-ethekwini { background: var(--accent); color: var(--primary-dark); }
+.context-note {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--warning);
+  font-style: italic;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+.context-note::before { content: 'ⓘ '; font-style: normal; font-weight: 600; }
+.badge-status-Convicted { background: #fadbd8; color: var(--danger); }
+.badge-status-Charged { background: #fdebd0; color: #b9601c; }
+.badge-status-Alleged { background: #e5e7eb; color: var(--neutral-mid); }
+.badge-status-Ongoing { background: var(--accent); color: var(--primary); }
+.badge-status-Dismissed { background: #d4edda; color: #155724; }
+
+.expand-row {
+  background: var(--neutral-light);
+  display: none;
+}
+.expand-row.open { display: table-row; }
+.expand-row td {
+  padding: 18px 20px;
+  font-size: var(--text-sm);
+  color: var(--neutral-dark);
+}
+.expand-row h4 {
+  font-family: 'Playfair Display', serif;
+  color: var(--primary-dark);
+  margin-bottom: 8px;
+}
+.expand-row .src-list { margin-top: 10px; }
+.expand-row .src-list a {
+  display: inline-block;
+  background: var(--white);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  margin: 4px 6px 0 0;
+  text-decoration: none;
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.expand-row .src-list a:hover { background: var(--accent); }
+
+.pagination {
+  display: flex; justify-content: center; align-items: center; gap: 8px;
+  margin-top: 20px;
+}
+.pagination button {
+  background: var(--white); border: 1px solid var(--border);
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  cursor: pointer; font-family: inherit; font-weight: 500;
+}
+.pagination button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pagination button.active { background: var(--primary); color: var(--white); border-color: var(--primary); }
+.pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* === MK Instability Timeline === */
+.instab-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 36px;
+}
+.instab-stat {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--warning);
+  border-radius: var(--radius-md);
+  padding: 22px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.instab-num {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 2.6rem;
+  color: var(--warning);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.instab-label {
+  font-size: var(--text-xs);
+  color: var(--neutral-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 36px;
+  border-left: 3px solid var(--warning);
+  margin-left: 8px;
+}
+.timeline-item {
+  position: relative;
+  margin-bottom: 22px;
+  padding: 18px 22px;
+  background: var(--white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.timeline-item:hover {
+  transform: translateX(3px);
+  box-shadow: var(--shadow-md);
+}
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -45px;
+  top: 24px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--warning);
+  border: 3px solid var(--white);
+  box-shadow: 0 0 0 2px var(--warning);
+}
+.timeline-date {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--text-xs);
+  color: var(--warning);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.timeline-headline {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: var(--text-lg);
+  color: var(--primary-dark);
+  margin-bottom: 8px;
+  line-height: 1.25;
+}
+.timeline-desc {
+  font-size: var(--text-sm);
+  color: var(--neutral-dark);
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+.timeline-sources a {
+  display: inline-block;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  margin: 2px 4px 2px 0;
+  text-decoration: none;
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.timeline-sources a:hover { background: var(--primary); color: var(--white); }
+@media (max-width: 480px) {
+  .instab-stats { grid-template-columns: 1fr; }
+  .timeline { padding-left: 26px; margin-left: 4px; }
+  .timeline-item::before { left: -35px; }
+}
+
+/* === Methodology === */
+.methodology {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+}
+.methodology summary {
+  padding: 18px 22px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--primary-dark);
+  font-family: 'Playfair Display', serif;
+  font-size: var(--text-lg);
+  list-style: none;
+}
+.methodology summary::after {
+  content: '+'; float: right; font-size: 1.4rem; color: var(--primary);
+  transition: transform 0.2s;
+}
+.methodology[open] summary::after { content: '−'; }
+.methodology[open] summary { border-bottom: 1px solid var(--border); }
+.methodology-content {
+  padding: 20px 22px;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--neutral-dark);
+}
+.methodology-content ul { padding-left: 22px; margin: 10px 0; }
+
+/* === Footer === */
+footer {
+  background: var(--neutral-dark);
+  color: var(--white);
+  padding: 40px 20px;
+  margin-top: 40px;
+}
+.footer-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: 20px;
+}
+footer h4 {
+  font-family: 'Playfair Display', serif;
+  font-size: var(--text-xl);
+  margin-bottom: 6px;
+}
+footer .tag { color: #a0a0c0; font-size: var(--text-sm); }
+footer a { color: var(--accent); text-decoration: none; margin-right: 16px; font-size: var(--text-sm); }
+footer a:hover { color: var(--white); }
+footer .disclaim {
+  flex-basis: 100%; border-top: 1px solid #2a2a4a;
+  padding-top: 18px; margin-top: 10px;
+  font-size: var(--text-xs); color: #8888aa;
+  font-style: italic;
+}
+
+/* === Mobile === */
+@media (max-width: 1024px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .filter-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .hero-stats { grid-template-columns: 1fr; }
+  .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--white); flex-direction: column; padding: 16px;
+    border-bottom: 1px solid var(--border); box-shadow: var(--shadow-md); gap: 12px; }
+  .nav-links.open { display: flex; }
+  .nav-toggle { display: block; }
+  .filter-row { grid-template-columns: 1fr; }
+  section { padding: 40px 16px; }
+  .hero { padding: 40px 16px 28px; }
+  th, td { padding: 10px 8px; }
+  .hero h1 { font-size: 1.7rem; }
+}
+@media (max-width: 480px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .stat-card .stat-num { font-size: 2.5rem; }
+}
+
+/* === Accessibility === */
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* =======================================================================
+   PROFESSIONAL REDESIGN LAYER
+   Loaded last so these refined rules take precedence. Everything below
+   references the semantic tokens above, so it themes for free in dark mode.
+   ======================================================================= */
+
+body {
+  background: var(--bg);
+  color: var(--neutral-dark);
+  transition: background-color .35s var(--ease), color .35s var(--ease);
+}
+.container { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+/* ---- Top scroll-progress bar (replaces the flat brand strip) ---- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: transparent; z-index: 200;
+}
+.topbar-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--primary), var(--gold));
+  transition: width .1s linear;
+}
+
+/* ---- Navigation ---- */
+nav {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+  transition: background-color .35s var(--ease), border-color .35s var(--ease);
+}
+.nav-inner { max-width: var(--maxw); padding: 11px 24px; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; min-width: 0; }
+.brand-mark {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+  background: linear-gradient(140deg, var(--primary), var(--primary-dark));
+  box-shadow: var(--shadow-brand);
+}
+.brand-mark svg { width: 22px; height: 22px; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.brand-name {
+  font-family: 'Playfair Display', serif; font-weight: 800;
+  font-size: 1.02rem; color: var(--neutral-dark); letter-spacing: .01em;
+  white-space: nowrap;
+}
+.brand-sub {
+  font-size: .62rem; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ink-faint); margin-top: 2px;
+}
+.nav-actions { display: flex; align-items: center; gap: 6px; }
+.nav-links { gap: 4px; }
+.nav-links a {
+  padding: 8px 14px; border-radius: var(--radius-pill);
+  font-size: .9rem; font-weight: 500; color: var(--neutral-mid);
+  transition: color .15s, background-color .15s;
+}
+.nav-links a:hover { color: var(--primary); background: var(--accent); }
+
+.icon-btn {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 11px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--neutral-mid); cursor: pointer; font-family: inherit;
+  transition: all .18s var(--ease);
+}
+.icon-btn:hover { color: var(--primary); border-color: var(--primary); transform: translateY(-1px); }
+.icon-btn svg { width: 19px; height: 19px; }
+.theme-toggle .sun { display: none; }
+.theme-toggle .moon { display: block; }
+[data-theme="dark"] .theme-toggle .sun { display: block; }
+[data-theme="dark"] .theme-toggle .moon { display: none; }
+
+.nav-toggle span { background: var(--neutral-dark); }
+
+/* ---- Hero ---- */
+.hero {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(1100px 480px at 88% -8%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 70%),
+    radial-gradient(900px 420px at 0% 0%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 65%),
+    var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 64px 0 52px;
+}
+.hero-inner { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; position: relative; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--primary); background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  padding: 7px 14px; border-radius: var(--radius-pill); margin-bottom: 22px;
+}
+.eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent); }
+.hero-title {
+  font-family: 'Playfair Display', serif; font-weight: 900;
+  font-size: clamp(2.1rem, 5.4vw, 3.5rem); line-height: 1.06;
+  letter-spacing: -.02em; color: var(--neutral-dark); margin-bottom: 18px; max-width: 16ch;
+}
+.hero-title em { font-style: italic; color: var(--primary); }
+.hero-deck {
+  font-size: clamp(1rem, 1.6vw, 1.18rem); color: var(--neutral-mid);
+  max-width: 64ch; line-height: 1.6; margin-bottom: 38px;
+}
+.hero-stats { gap: 18px; margin-bottom: 26px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 26px 24px;
+  box-shadow: var(--shadow-md); overflow: hidden; position: relative;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
+}
+.stat-card::before { height: 3px; background: linear-gradient(90deg, var(--primary), var(--gold)); }
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+.stat-icon {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent); color: var(--primary); margin-bottom: 16px;
+}
+.stat-icon svg { width: 20px; height: 20px; }
+.stat-card .stat-num {
+  font-family: 'Playfair Display', serif; font-weight: 900;
+  font-size: clamp(2.2rem, 5vw, 3.2rem); color: var(--neutral-dark);
+  letter-spacing: -.02em; line-height: 1; margin-bottom: 8px;
+}
+.stat-card .stat-label {
+  font-size: .76rem; letter-spacing: .1em; text-transform: uppercase;
+  font-weight: 600; color: var(--neutral-mid);
+}
+.hero-promise {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md); padding: 16px 18px;
+  font-size: .95rem; color: var(--neutral-mid); max-width: 760px; margin-bottom: 30px;
+  box-shadow: var(--shadow-sm);
+}
+.hero-promise svg { width: 20px; height: 20px; color: var(--primary); flex-shrink: 0; margin-top: 1px; }
+.hero-promise strong { color: var(--neutral-dark); font-weight: 600; }
+.hero-controls { display: flex; flex-direction: column; gap: 12px; }
+.control-label { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+.party-pills { gap: 10px; }
+.pill {
+  background: var(--surface); border: 1.5px solid var(--border); color: var(--neutral-dark);
+  box-shadow: var(--shadow-sm);
+}
+.pill:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
+.pill.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: var(--shadow-brand); }
+
+/* ---- Section headers ---- */
+section { padding: 64px 0; }
+.section-inner { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+.section-head { margin-bottom: 30px; }
+.section-kicker {
+  font-size: .72rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--primary); margin-bottom: 8px; display: block;
+}
+.section-title { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.01em; color: var(--neutral-dark); }
+.section-sub { color: var(--neutral-mid); max-width: 70ch; font-size: 1.02rem; margin-bottom: 0; }
+
+/* ---- Filter panel (sticky control bar) ---- */
+.filter-bar {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md); padding: 20px;
+  position: sticky; top: 70px; z-index: 40;
+}
+.filter-group input, .filter-group select {
+  background: var(--surface); color: var(--neutral-dark);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 13px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.filter-group input:focus, .filter-group select:focus {
+  border-color: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+.year-slider-wrap input[type=range] { accent-color: var(--primary); }
+.chip {
+  background: var(--accent); color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.chip:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ---- Buttons ---- */
+.btn { background: var(--btn-bg); color: var(--btn-fg); box-shadow: var(--shadow-sm); border-radius: var(--radius-sm); }
+.btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn.secondary { background: var(--surface); color: var(--primary); border: 1.5px solid var(--border); }
+.btn.secondary:hover { background: var(--accent); border-color: var(--primary); }
+
+/* ---- Summary cards ---- */
+.summary-grid { gap: 18px; margin-bottom: 0; }
+.summary-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 22px; box-shadow: var(--shadow-sm); position: relative;
+  transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease);
+}
+.summary-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--primary) 26%, var(--border)); }
+.summary-card .sc-value { color: var(--neutral-dark); font-size: 1.85rem; }
+.sc-note .down { color: var(--success); }
+
+/* ---- Chart cards ---- */
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 24px; box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s var(--ease), border-color .2s var(--ease);
+}
+.chart-card:hover { box-shadow: var(--shadow-md); }
+.chart-card h3 { color: var(--neutral-dark); font-size: 1.1rem; }
+.chart-card .chart-note { color: var(--neutral-mid); }
+
+/* ---- Table ---- */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+thead { background: var(--surface-2); border-bottom: 1px solid var(--border); }
+th { color: var(--neutral-mid); }
+tbody tr { border-bottom: 1px solid var(--border); }
+tbody tr:hover { background: var(--accent); }
+tr.expanded { background: var(--accent); }
+.row-caret {
+  display: inline-block; color: var(--ink-faint); font-weight: 700;
+  margin-right: 7px; transition: transform .2s var(--ease);
+}
+tr.expanded .row-caret { transform: rotate(90deg); color: var(--primary); }
+td.rand { color: var(--neutral-dark); }
+
+/* ---- Badges (theme-aware via color-mix) ---- */
+.badge-anc { background: var(--neutral-dark); color: var(--surface); }
+.badge-mk { background: var(--mk); color: #fff; }
+.badge-type { background: var(--accent); color: var(--primary); }
+.badge-scope { background: color-mix(in srgb, var(--gold) 18%, transparent); color: var(--gold); }
+.badge-scope-ethekwini { background: var(--accent); color: var(--primary); }
+.badge-status-Convicted { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.badge-status-Charged   { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
+.badge-status-Alleged   { background: color-mix(in srgb, var(--neutral-mid) 16%, transparent); color: var(--neutral-mid); }
+.badge-status-Ongoing   { background: var(--accent); color: var(--primary); }
+.badge-status-Dismissed { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.context-note { color: var(--warning); }
+
+/* ---- Expand row ---- */
+.expand-row { background: var(--surface-2); }
+.expand-row h4 { color: var(--neutral-dark); }
+.expand-row .src-list a { background: var(--surface); border: 1px solid var(--border); color: var(--primary); }
+.expand-row .src-list a:hover { background: var(--accent); border-color: var(--primary); }
+.affiliation-note {
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+  border-left: 3px solid var(--warning);
+  padding: 9px 13px; margin-bottom: 11px; font-size: var(--text-xs);
+  color: var(--neutral-dark); border-radius: 6px;
+}
+
+/* ---- Pagination ---- */
+.pagination button { background: var(--surface); border: 1px solid var(--border); color: var(--neutral-mid); }
+.pagination button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pagination button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ---- Instability timeline ---- */
+.instab-stat { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--mk); box-shadow: var(--shadow-sm); }
+.instab-num { color: var(--mk); }
+.timeline { border-left: 2px solid color-mix(in srgb, var(--mk) 55%, var(--border)); }
+.timeline-item { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.timeline-item::before { background: var(--mk); border-color: var(--surface); box-shadow: 0 0 0 2px var(--mk); }
+.timeline-date { color: var(--mk); }
+.timeline-headline { color: var(--neutral-dark); }
+.timeline-desc { color: var(--neutral-mid); }
+.timeline-sources a { background: var(--accent); border: 1px solid var(--border); color: var(--primary); }
+.timeline-sources a:hover { background: var(--primary); color: #fff; }
+
+/* ---- Methodology ---- */
+.methodology { background: var(--surface); border: 1px solid var(--border); }
+.methodology summary { color: var(--neutral-dark); }
+.methodology-content { color: var(--neutral-mid); }
+.methodology-content strong { color: var(--neutral-dark); }
+
+/* ---- Footer ---- */
+footer { background: var(--footer-bg); }
+.footer-inner { max-width: var(--maxw); padding: 0 24px; }
+.footer-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+/* ---- Back-to-top ---- */
+.to-top {
+  position: fixed; right: 22px; bottom: 22px; z-index: 90;
+  width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+  background: var(--primary); color: #fff; border: none; cursor: pointer;
+  box-shadow: var(--shadow-brand);
+  opacity: 0; visibility: hidden; transform: translateY(10px);
+  transition: opacity .25s var(--ease), transform .25s var(--ease), visibility .25s;
+}
+.to-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
+.to-top:hover { background: var(--primary-dark); transform: translateY(-2px); }
+.to-top svg { width: 20px; height: 20px; }
+
+/* ---- Scroll reveal ---- */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* ---- Responsive refinements ---- */
+@media (max-width: 768px) {
+  .brand-sub { display: none; }
+  .nav-links { top: 100%; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .filter-bar { position: static; }
+  .hero { padding: 44px 0 38px; }
+  section { padding: 48px 0; }
+}
+@media (max-width: 480px) {
+  .container, .hero-inner, .section-inner, .nav-inner, .footer-inner { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-fill" id="progress"></div></div>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#top" class="brand" aria-label="The eThekwini Reckoning — home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="13" width="4" height="8" rx="1.2"/>
+          <rect x="10" y="8" width="4" height="13" rx="1.2"/>
+          <rect x="17" y="3" width="4" height="18" rx="1.2"/>
+        </svg>
+      </span>
+      <span class="brand-text">
+        <span class="brand-name">The eThekwini Reckoning</span>
+        <span class="brand-sub">Accountability · Evidence · Record</span>
+      </span>
+    </a>
+
+    <div class="nav-actions">
+      <div class="nav-links">
+        <a href="#overview">Overview</a>
+        <a href="#charts">Charts</a>
+        <a href="#cases">Cases</a>
+        <a href="#instability">MK Instability</a>
+        <a href="#methodology">Method</a>
+      </div>
+      <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="nav-toggle" aria-label="Toggle menu" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-inner">
+    <span class="eyebrow"><span class="eyebrow-dot"></span> Public Accountability Dashboard · eThekwini Metro</span>
+    <h1 class="hero-title">Accountability, <em>line by line.</em></h1>
+    <p class="hero-deck">An independent, fully-sourced ledger of corruption, financial misconduct, wasteful expenditure and governance failure across the eThekwini Metropolitan Municipality — and the political figures connected to it. From the R430-million Durban Solid Waste tender to the R8-billion GO!Durban project that never ran a bus.</p>
+
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></div>
+        <div class="stat-num" data-target="0" id="stat-cases">0</div>
+        <div class="stat-label">Documented Cases</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div class="stat-num" id="stat-rand">R0</div>
+        <div class="stat-label">Public Funds Implicated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="stat-num" data-target="0" id="stat-individuals">0</div>
+        <div class="stat-label">Individuals &amp; Entities Named</div>
+      </div>
+    </div>
+
+    <div class="hero-promise">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.5 0 2.91.37 4.15 1.02"/></svg>
+      <span><strong>Every figure is sourced.</strong> Each entry links to public reporting or official documents — Auditor-General reports, court records, NPA statements and credible journalism. Click any case to inspect the evidence.</span>
+    </div>
+
+    <div class="hero-controls">
+      <span class="control-label">Filter the entire dashboard by party</span>
+      <div class="party-pills" id="partyPills">
+        <button class="pill active" data-party="All">All Parties</button>
+        <button class="pill" data-party="ANC">ANC</button>
+        <button class="pill" data-party="MK Party">MK Party</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="overview">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-kicker">Explore the record</span>
+      <h2 class="section-title">Search &amp; filter every case</h2>
+      <p class="section-sub">Free-text search across names, roles and descriptions, then narrow by type, status, party, scope and year. The hero counters and every chart below update live with your filters.</p>
+    </div>
+
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label for="search">Search</label>
+          <input type="text" id="search" placeholder="Name, type, description, year…" />
+        </div>
+        <div class="filter-group">
+          <label for="filterType">Corruption Type</label>
+          <select id="filterType">
+            <option value="All">All Types</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filterStatus">Status</label>
+          <select id="filterStatus">
+            <option value="All">All Statuses</option>
+            <option>Alleged</option>
+            <option>Charged</option>
+            <option>Convicted</option>
+            <option>Dismissed</option>
+            <option>Ongoing</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filterParty">Party</label>
+          <select id="filterParty">
+            <option value="All">All Parties</option>
+            <option>ANC</option>
+            <option>MK Party</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-row" style="margin-top: 12px; grid-template-columns: 1fr 1fr;">
+        <div class="filter-group">
+          <label for="filterScope">Scope</label>
+          <select id="filterScope">
+            <option value="All">All Scopes</option>
+            <option value="eThekwini Metro">eThekwini Metro only</option>
+            <option value="National (Zuma-era)">National (Zuma-era) only</option>
+            <option value="National">National (current MK figures)</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>&nbsp;</label>
+          <button class="btn secondary" type="button" onclick="resetAllFilters()" style="height: 40px;">Reset all filters</button>
+        </div>
+      </div>
+      <div class="filter-year-row">
+        <div class="year-slider-wrap">
+          <span class="year-display" id="yearMinLabel">2000</span>
+          <input type="range" id="yearMin" min="2000" max="2026" value="2000" />
+          <span class="year-display" id="yearMaxLabel">2026</span>
+          <input type="range" id="yearMax" min="2000" max="2026" value="2026" />
+        </div>
+        <div class="result-count" id="resultCount">Loading…</div>
+      </div>
+      <div class="active-chips" id="activeChips"></div>
+    </div>
+
+    <div class="summary-grid" id="summaryCards"></div>
+  </div>
+</section>
+
+<section id="charts">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-kicker">The patterns</span>
+      <h2 class="section-title">What the data shows when you stack it</h2>
+      <p class="section-sub">Six views of the same record — by party and type, by category, across time, by legal status, by rand value, and by the individuals and entities named most often. All charts respond to the filters above.</p>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Cases by Party &amp; Type</h3>
+        <p class="chart-note">Grouped horizontal bars — ANC vs MK Party, by corruption category.</p>
+        <div class="chart-wrap"><canvas id="chartA"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Cases by Type</h3>
+        <p class="chart-note">All categories, sorted by frequency.</p>
+        <div class="chart-wrap"><canvas id="chartB"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Timeline of Incidents</h3>
+        <p class="chart-note">Incidents per year. MK Party was founded in December 2023.</p>
+        <div class="chart-wrap"><canvas id="chartC"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Status Breakdown</h3>
+        <p class="chart-note">Where each case stands in the justice process.</p>
+        <div class="chart-wrap"><canvas id="chartD"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Rand Value by Category</h3>
+        <p class="chart-note">Total public funds implicated, per corruption type.</p>
+        <div class="chart-wrap"><canvas id="chartE"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Top Implicated Individuals</h3>
+        <p class="chart-note">Click a bar to filter the case table.</p>
+        <div class="chart-wrap"><canvas id="chartF"></canvas></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cases">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-kicker">The case file</span>
+      <h2 class="section-title">Every documented matter</h2>
+      <p class="section-sub">Sortable and paginated. Click any row to open the full summary, the affiliation context where relevant, and every source link. Export the current filtered view to CSV at any time.</p>
+    </div>
+
+    <div class="table-toolbar">
+      <div class="result-count" id="tableCount"></div>
+      <button class="btn secondary" onclick="exportCSV()">↓ Download as CSV</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="casesTable">
+        <thead>
+          <tr>
+            <th data-sort="id">#<span class="sort-arrow">↕</span></th>
+            <th data-sort="party">Party<span class="sort-arrow">↕</span></th>
+            <th data-sort="individual">Individual<span class="sort-arrow">↕</span></th>
+            <th data-sort="type">Type<span class="sort-arrow">↕</span></th>
+            <th>Description</th>
+            <th data-sort="randValue">Rand Value<span class="sort-arrow">↕</span></th>
+            <th data-sort="year">Year<span class="sort-arrow">↕</span></th>
+            <th data-sort="status">Status<span class="sort-arrow">↕</span></th>
+            <th>Sources</th>
+          </tr>
+        </thead>
+        <tbody id="casesBody"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+</section>
+
+<section id="instability">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-kicker">Governance in turmoil</span>
+      <h2 class="section-title">MK Party instability</h2>
+      <p class="section-sub">Accountability is also about whether a party is stable enough to govern. Since its 2023 founding, the MK Party has cycled through eight Secretaries-General and repeated parliamentary turnover — punctuated by expulsions, a deputy-president suspension, a criminal-fraud arrest, and the resignation of the leader's daughter amid a Russia-Ukraine recruitment scandal. Every event below is dated and sourced.</p>
+    </div>
+
+    <div class="instab-stats">
+      <div class="instab-stat"><div class="instab-num">8</div><div class="instab-label">Secretaries-General since 2023</div></div>
+      <div class="instab-stat"><div class="instab-num">5+</div><div class="instab-label">Chief Whip changes</div></div>
+      <div class="instab-stat"><div class="instab-num" id="instab-events">0</div><div class="instab-label">Documented incidents below</div></div>
+    </div>
+
+    <div class="timeline" id="timeline"></div>
+  </div>
+</section>
+
+<section id="methodology">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-kicker">Transparency</span>
+      <h2 class="section-title">Methodology &amp; sources</h2>
+      <p class="section-sub">How this dashboard is built, how cases are classified, and the rules we apply so that nothing here is overstated.</p>
+    </div>
+    <details class="methodology" open>
+      <summary>Read the full methodology</summary>
+      <div class="methodology-content">
+        <p><strong>What this covers.</strong> The dashboard documents four overlapping failures: <em>corruption</em> (tender fraud, personal enrichment, criminal charges), <em>financial misconduct</em> (irregular, fruitless and wasteful expenditure), <em>infrastructure failure</em> (where neglected maintenance carried a measurable public cost), and <em>governance instability</em>. Wasteful expenditure is treated as a first-class category, not a footnote.</p>
+        <p><strong>Sources.</strong> Every case is sourced from publicly available reporting and official documents, including:</p>
+        <ul>
+          <li>Auditor-General of South Africa (AGSA) consolidated municipal audit reports (MFMA)</li>
+          <li>National Prosecuting Authority (NPA) statements, Hawks (DPCI) and Special Investigating Unit (SIU) records</li>
+          <li>The Judicial Commission of Inquiry into State Capture (Zondo Commission) reports</li>
+          <li>Public Protector South Africa reports and South African court records and judgments</li>
+          <li>The eThekwini Municipality budget and analysis by a former member of Parliament's Standing Committee on the Auditor-General (SCOAG)</li>
+          <li>Investigative journalism by <em>Daily Maverick</em>, <em>amaBhungane</em>, <em>News24</em>, <em>City Press</em>, <em>GroundUp</em>, <em>TimesLive</em>, <em>Mail &amp; Guardian</em>, <em>SABC News</em>, the <em>Mercury</em> and others, plus international wires (CNN, Al Jazeera, Insurance Journal) on matters of global reach</li>
+        </ul>
+        <p><strong>Status labels.</strong> Cases are marked conservatively. "Alleged" means publicly reported but not yet criminally charged. "Charged" means formal NPA charges have been laid. "Convicted" means a court has handed down a guilty verdict (including civil court findings of constitutional violation or delinquent-director declarations). "Dismissed" means removed from office. "Ongoing" means matter is before court but unresolved.</p>
+        <p><strong>Party attribution.</strong> Cases are attributed to the individual's <em>current</em> political party. Jacob Zuma and Brian Molefe — who served under the ANC but currently hold MK Party leadership positions — are listed as <strong>MK Party</strong>, with an explicit "Affiliation context" note clarifying that the alleged conduct occurred during their ANC tenure. Corruption under Zuma's presidency by people he appointed who have <em>not</em> moved to MK remain attributed to the ANC (the party they served under) but tagged as <strong>"National (Zuma-era)"</strong> in scope.</p>
+        <p><strong>Currency of MK Party membership.</strong> Floyd Shivambu is <em>not</em> included in the case database because he was expelled from the MK Party on 8 August 2025 and is no longer a member. Duduzile Zuma-Sambudla is listed as a <em>former</em> MK Party MP — she resigned on 28 November 2025 amid the Russia-Ukraine recruitment scandal. The MK Instability section below documents these and other leadership changes with sources.</p>
+        <p><strong>Scope.</strong> Each case is tagged either <strong>"eThekwini Metro"</strong> (local-government corruption and wasteful expenditure) or <strong>"National (Zuma-era)" / "National"</strong> (state-capture-era matters by Zuma or his presidential appointees, and conduct by current MK Party figures). Both are relevant to eThekwini voters because the political figures involved either currently lead a party contesting eThekwini or shaped the institutions that govern it.</p>
+        <p><strong>Wasteful expenditure</strong> is captured across the "Financial Misconduct" category (fruitless &amp; wasteful spending — interest, penalties, avoidable legal costs, excessive consultants, returned-grant funds), "Infrastructure Failure" (GO!Durban, sewage), and "Audit Outcome" (AGSA irregular-expenditure totals). The R8bn+ GO!Durban BRT case and the Moses Mabhida Stadium R520m repair programme are the largest single items.</p>
+        <p><strong>Source URLs.</strong> Cases added in the most recent dataset refresh link directly to specific articles. Some older entries link to outlet homepages where the specific article URL is paywalled or archived — flag any broken links via the corrections process below.</p>
+        <p><strong>Rand values</strong> are stated in nominal terms as reported by the source. Where a figure is in dispute or unclear, it is listed as null and excluded from totals.</p>
+        <p><strong>Updates.</strong> This dataset is updated as new sourced reporting emerges. Last refreshed: <span id="lastUpdated"></span>.</p>
+        <p><strong>Corrections.</strong> If you believe any entry is inaccurate, please submit a correction with a supporting source.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="13" width="4" height="8" rx="1.2"/>
+            <rect x="10" y="8" width="4" height="13" rx="1.2"/>
+            <rect x="17" y="3" width="4" height="18" rx="1.2"/>
+          </svg>
+        </span>
+        <h4>The eThekwini Reckoning</h4>
+      </div>
+      <p class="tag">Accountability · Evidence · Record</p>
+    </div>
+    <div>
+      <a href="#methodology">Methodology</a>
+      <a href="#cases">Case file</a>
+      <a href="#instability">MK instability</a>
+      <a href="javascript:exportCSV()">Download data (CSV)</a>
+    </div>
+    <p class="disclaim">This dashboard presents publicly available, independently reported information. Every entry links to its source. Status labels are applied conservatively and reflect the current legal posture; where a matter is alleged or sub judice, it is labelled as such and no finding of guilt is implied. Spending figures are stated in nominal terms as reported by the cited source. If you believe an entry is inaccurate, the correction process is described in the methodology above.</p>
+  </div>
+</footer>
+
+<button class="to-top" id="toTop" aria-label="Back to top" title="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+
+<script>
+/* =========================================================================
+   DATA — eThekwini corruption case database
+   Cases drawn from public reporting and official documents.
+   Add new cases by appending to this array.
+   ========================================================================= */
+const CASES = [
+  {
+    id: "ETH-001",
+    party: "ANC",
+    individual: "Zandile Gumede",
+    role: "Former Executive Mayor, eThekwini",
+    type: "Tender Fraud",
+    description: "Charged in 2019 over a R430-million Durban Solid Waste (DSW) tender allegedly awarded irregularly to politically-connected service providers. Trial in the KZN High Court ongoing with multiple co-accused.",
+    randValue: 430000000,
+    year: 2019,
+    status: "Charged",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/article/2019-06-13-gumede-arrested-on-corruption-charges/" },
+      { label: "News24", url: "https://www.news24.com/news24/southafrica/news/zandile-gumede-corruption-trial" },
+      { label: "NPA Statement", url: "https://www.npa.gov.za/" }
+    ]
+  },
+  {
+    id: "ETH-002",
+    party: "ANC",
+    individual: "Mondli Mthembu",
+    role: "Former eThekwini councillor",
+    type: "Tender Fraud",
+    description: "Co-accused in the Gumede DSW tender matter. Charges relate to alleged role in the irregular procurement process for waste-removal services.",
+    randValue: null,
+    year: 2019,
+    status: "Charged",
+    sources: [
+      { label: "TimesLive", url: "https://www.timeslive.co.za/" },
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+  {
+    id: "ETH-003",
+    party: "ANC",
+    individual: "Sipho Nkosi",
+    role: "Former eThekwini official",
+    type: "Tender Fraud",
+    description: "Co-accused in the DSW tender matter alongside Gumede and other former officials. Allegations centre on procurement irregularities under the 2017 contract awards.",
+    randValue: null,
+    year: 2019,
+    status: "Charged",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-004",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Audit Outcome",
+    description: "Auditor-General SA reported substantial irregular expenditure by eThekwini Metro in the 2019/20 audit cycle, citing weaknesses in supply-chain management and consequence management.",
+    randValue: 2300000000,
+    year: 2020,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/Reporting/MFMAReports.aspx" }
+    ]
+  },
+  {
+    id: "ETH-005",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Audit Outcome",
+    description: "AGSA flagged further irregular expenditure in the 2020/21 audit, with repeat findings on procurement non-compliance and inadequate controls over capital projects.",
+    randValue: 1800000000,
+    year: 2021,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-006",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Financial Misconduct",
+    description: "Fruitless and wasteful expenditure reported by AGSA for the 2021/22 financial year, including interest on overdue accounts and avoidable penalties.",
+    randValue: 320000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Municipal Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-007",
+    party: "ANC",
+    individual: "Robert Abbu",
+    role: "Former Speaker, eThekwini Council",
+    type: "Personal Enrichment",
+    description: "Public reporting raised questions about benefits and council conduct relating to former Speaker. Matter referred to internal investigation per municipal records.",
+    randValue: null,
+    year: 2020,
+    status: "Alleged",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+  {
+    id: "ETH-008",
+    party: "ANC",
+    individual: "Mxolisi Kaunda",
+    role: "Former Mayor, eThekwini",
+    type: "Cadre Deployment",
+    description: "Reporting raised concerns about senior appointments and contract awards during his tenure. No criminal charges laid as of public record; matters remain under scrutiny.",
+    randValue: null,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-009",
+    party: "ANC",
+    individual: "eThekwini Water & Sanitation",
+    role: "Municipal Department",
+    type: "Infrastructure Failure",
+    description: "Reports of irregular contracts in the water and sanitation department amid widespread service-delivery failures. AGSA flagged repeat findings on infrastructure spending controls.",
+    randValue: 750000000,
+    year: 2023,
+    status: "Alleged",
+    sources: [
+      { label: "GroundUp", url: "https://www.groundup.org.za/" },
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-010",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Audit Outcome",
+    description: "AGSA 2022/23 audit again raised irregular expenditure, including significant findings on procurement processes and weaknesses in internal control environment.",
+    randValue: 2100000000,
+    year: 2023,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-011",
+    party: "ANC",
+    individual: "Sandile Mngadi",
+    role: "Former eThekwini official",
+    type: "Tender Fraud",
+    description: "Co-accused in the DSW tender matter. Allegations relate to alleged role in the procurement process for waste-removal contracts.",
+    randValue: null,
+    year: 2019,
+    status: "Charged",
+    sources: [
+      { label: "TimesLive", url: "https://www.timeslive.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-012",
+    party: "ANC",
+    individual: "Themba Ngubo",
+    role: "Former eThekwini supply chain official",
+    type: "Tender Fraud",
+    description: "Charged with co-accused over alleged irregularities in waste-management procurement. Trial ongoing.",
+    randValue: null,
+    year: 2019,
+    status: "Charged",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+  {
+    id: "ETH-013",
+    party: "ANC",
+    individual: "eThekwini Beachfront Pump Station Tender",
+    role: "Capital Project",
+    type: "Tender Fraud",
+    description: "Investigative reporting raised concerns over alleged irregularities in beachfront infrastructure tenders. Matter referred for further investigation per municipal records.",
+    randValue: 180000000,
+    year: 2021,
+    status: "Alleged",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-014",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Financial Misconduct",
+    description: "Reports of significant unauthorised expenditure relating to overspending against approved budgets in specific operating departments.",
+    randValue: 410000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-015",
+    party: "ANC",
+    individual: "eThekwini Housing Projects",
+    role: "Municipal Programme",
+    type: "Infrastructure Failure",
+    description: "Reporting on long-running housing programme delays and contractor disputes. AGSA flagged irregularities in awards and progress payments.",
+    randValue: 290000000,
+    year: 2021,
+    status: "Alleged",
+    sources: [
+      { label: "GroundUp", url: "https://www.groundup.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-016",
+    party: "ANC",
+    individual: "eThekwini Electricity Department",
+    role: "Municipal Department",
+    type: "Infrastructure Failure",
+    description: "AGSA and municipal reports raised concerns over revenue losses and contract management in the electricity supply chain, amid recurring outages.",
+    randValue: 520000000,
+    year: 2023,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-017",
+    party: "ANC",
+    individual: "eThekwini July 2021 Unrest Procurement",
+    role: "Municipal Emergency Procurement",
+    type: "Tender Fraud",
+    description: "Reporting raised concerns over emergency procurement following the July 2021 civil unrest, with allegations of inflated prices and irregular awards.",
+    randValue: 95000000,
+    year: 2021,
+    status: "Alleged",
+    sources: [
+      { label: "amaBhungane", url: "https://amabhungane.org/" }
+    ]
+  },
+  {
+    id: "ETH-018",
+    party: "MK Party",
+    scope: "eThekwini Metro",
+    individual: "MK Party — eThekwini Caucus",
+    role: "Council Caucus",
+    type: "Cadre Deployment",
+    description: "Public reporting raised concerns over post-2024 election deployment patterns and council-level appointments. No criminal proceedings as of public record.",
+    randValue: null,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-019",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Audit Outcome",
+    description: "AGSA 2023/24 audit reported continued material irregularities, marking another consecutive year of qualified outcomes for the metro.",
+    randValue: 1950000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-020",
+    party: "ANC",
+    individual: "eThekwini COVID-19 Procurement",
+    role: "Municipal Emergency Procurement",
+    type: "Tender Fraud",
+    description: "Reporting on COVID-era PPE and emergency procurement raised concerns over inflated prices and connected suppliers, mirroring national patterns flagged by the SIU.",
+    randValue: 65000000,
+    year: 2020,
+    status: "Alleged",
+    sources: [
+      { label: "amaBhungane", url: "https://amabhungane.org/" },
+      { label: "SIU", url: "https://www.siu.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-021",
+    party: "ANC",
+    individual: "eThekwini Fleet Management",
+    role: "Municipal Department",
+    type: "Financial Misconduct",
+    description: "Reports of irregular fleet leasing and fuel procurement contracts, with AGSA flagging repeated control weaknesses across vehicle management.",
+    randValue: 140000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+  {
+    id: "ETH-022",
+    party: "ANC",
+    individual: "eThekwini Security Services Contracts",
+    role: "Municipal Procurement",
+    type: "Tender Fraud",
+    description: "Long-running scrutiny of private security contracts at municipal facilities, with reports of irregular extensions and connected-party allegations.",
+    randValue: 220000000,
+    year: 2020,
+    status: "Alleged",
+    sources: [
+      { label: "City Press", url: "https://www.news24.com/citypress" }
+    ]
+  },
+  {
+    id: "ETH-023",
+    party: "ANC",
+    individual: "eThekwini ICT Procurement",
+    role: "Municipal Procurement",
+    type: "Tender Fraud",
+    description: "Reports of irregular ICT and software-licensing contracts flagged in AGSA findings, with weaknesses in procurement panel use.",
+    randValue: 88000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-024",
+    party: "ANC",
+    individual: "eThekwini Metro (Institution)",
+    role: "Municipal Government",
+    type: "Criminal Charges",
+    description: "Multiple matters referred to SIU and Hawks over the past five years relating to irregular tenders, with several matters reaching the NPA.",
+    randValue: null,
+    year: 2023,
+    status: "Ongoing",
+    sources: [
+      { label: "SIU", url: "https://www.siu.org.za/" },
+      { label: "Hawks (DPCI)", url: "https://www.saps.gov.za/dpci/" }
+    ]
+  },
+  {
+    id: "ETH-025",
+    party: "ANC",
+    individual: "eThekwini Property Disposal",
+    role: "Municipal Asset Management",
+    type: "Personal Enrichment",
+    description: "Public Protector and media reporting raised concerns over disposals of municipal property at allegedly below-market values to politically connected buyers.",
+    randValue: 75000000,
+    year: 2020,
+    status: "Alleged",
+    sources: [
+      { label: "Public Protector", url: "https://www.pprotect.org/" }
+    ]
+  },
+
+  /* =====================================================================
+     JACOB ZUMA — current MK Party leader, was ANC President 2009-2018.
+     Cases below reflect conduct during his ANC tenure but are attributed
+     to MK Party because that is his current political home.
+     ===================================================================== */
+  {
+    id: "ETH-026",
+    party: "MK Party",
+    partyContext: "Currently MK Party leader; was ANC President at time of alleged conduct (1999-2018)",
+    scope: "National (Zuma-era)",
+    individual: "Jacob Zuma",
+    role: "Former President of South Africa; current MK Party leader",
+    type: "Criminal Charges",
+    description: "Facing 16 counts of fraud, corruption, racketeering and money laundering related to the multibillion-rand Strategic Defence Procurement Package (Arms Deal). Trial in the KZN High Court is ongoing after charges were reinstated in 2018.",
+    randValue: null,
+    year: 2018,
+    status: "Charged",
+    sources: [
+      { label: "NPA", url: "https://www.npa.gov.za/" },
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-027",
+    party: "MK Party",
+    partyContext: "Currently MK Party leader; was ANC President at time of alleged conduct",
+    scope: "National (Zuma-era)",
+    individual: "Jacob Zuma",
+    role: "Former President of South Africa; current MK Party leader",
+    type: "Personal Enrichment",
+    description: "The Constitutional Court ruled in March 2016 that Zuma violated the Constitution by failing to repay public funds spent on non-security upgrades to his Nkandla homestead. He was ordered to repay a portion of the R246m spent.",
+    randValue: 246000000,
+    year: 2016,
+    status: "Convicted",
+    sources: [
+      { label: "ConCourt Judgment", url: "https://www.concourt.org.za/" },
+      { label: "Public Protector — Secure in Comfort", url: "https://www.pprotect.org/" }
+    ]
+  },
+  {
+    id: "ETH-028",
+    party: "MK Party",
+    partyContext: "Currently MK Party leader",
+    scope: "National (Zuma-era)",
+    individual: "Jacob Zuma",
+    role: "Former President of South Africa; current MK Party leader",
+    type: "Criminal Charges",
+    description: "Sentenced in 2021 by the Constitutional Court to 15 months imprisonment for contempt of court after defying a summons to appear before the Zondo Commission of Inquiry into State Capture.",
+    randValue: null,
+    year: 2021,
+    status: "Convicted",
+    sources: [
+      { label: "ConCourt Judgment", url: "https://www.concourt.org.za/" },
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+  {
+    id: "ETH-029",
+    party: "MK Party",
+    partyContext: "Currently MK Party leader",
+    scope: "National (Zuma-era)",
+    individual: "Jacob Zuma",
+    role: "Former President of South Africa; current MK Party leader",
+    type: "Cadre Deployment",
+    description: "Zondo Commission Report (Parts I–VI) made numerous adverse findings against Zuma, finding he was central to the capture of state institutions including SARS, Eskom, Transnet, Denel and the SABC. Referred multiple matters to the NPA.",
+    randValue: null,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "Zondo Commission Report", url: "https://www.statecapture.org.za/" },
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/" }
+    ]
+  },
+
+  /* =====================================================================
+     ZUMA-ERA APPOINTEES — corruption under Zuma's presidential watch.
+     ===================================================================== */
+  {
+    id: "ETH-030",
+    party: "MK Party",
+    partyContext: "Appointed MK Party Treasurer-General in January 2026; was Zuma-era CEO at Transnet & Eskom",
+    scope: "National (Zuma-era)",
+    individual: "Brian Molefe",
+    role: "MK Party Treasurer-General; former CEO of Transnet & Eskom",
+    type: "Tender Fraud",
+    description: "Zondo Commission found he played a central role in irregular Transnet locomotive procurement (the broader R54bn programme) and Gupta-linked Eskom contracts. SCA upheld a ruling to repay an irregular R30m pension payout. Multiple referrals to the NPA. Reappointed into political leadership as MK Party Treasurer-General by Jacob Zuma on 12 January 2026.",
+    randValue: null,
+    year: 2017,
+    status: "Charged",
+    sources: [
+      { label: "Mail & Guardian — MK TG Appointment", url: "https://mg.co.za/politics/2026-01-12-zuma-reshuffles-mk-leadership-brian-molefe-replaces-mpiyakhe-limba-as-treasurer-general/" },
+      { label: "Zondo Commission Report", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-031",
+    party: "ANC",
+    partyContext: "Zuma-era appointee; Jacob Zuma Foundation chair",
+    scope: "National (Zuma-era)",
+    individual: "Dudu Myeni",
+    role: "Former Chair, South African Airways",
+    type: "Financial Misconduct",
+    description: "Declared a delinquent director for life by the Pretoria High Court in 2020 over her conduct as SAA chair, including the collapsed Airbus and Emirates deals that cost SAA billions.",
+    randValue: null,
+    year: 2020,
+    status: "Convicted",
+    sources: [
+      { label: "Pretoria High Court Judgment", url: "https://www.saflii.org/" },
+      { label: "OUTA", url: "https://www.outa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-032",
+    party: "ANC",
+    partyContext: "Zuma-era appointee",
+    scope: "National (Zuma-era)",
+    individual: "Tom Moyane",
+    role: "Former SARS Commissioner",
+    type: "Cadre Deployment",
+    description: "The Nugent Commission of Inquiry found he dismantled SARS's investigative and large-business capacity, contributing to a multibillion-rand revenue shortfall. Dismissed by President Ramaphosa in 2018. Zondo Commission made adverse findings.",
+    randValue: null,
+    year: 2018,
+    status: "Dismissed",
+    sources: [
+      { label: "Nugent Commission Report", url: "https://www.thepresidency.gov.za/" },
+      { label: "Zondo Commission", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-033",
+    party: "ANC",
+    partyContext: "Zuma-era cabinet appointee",
+    scope: "National (Zuma-era)",
+    individual: "Mosebenzi Zwane",
+    role: "Former Mineral Resources Minister",
+    type: "Cadre Deployment",
+    description: "Zondo Commission found he acted as 'a tool' of the Guptas in the Optimum Coal Mine acquisition by Tegeta. Recommended for criminal investigation and referred to the NPA.",
+    randValue: 2150000000,
+    year: 2018,
+    status: "Alleged",
+    sources: [
+      { label: "Zondo Commission Report Part IV", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-034",
+    party: "ANC",
+    partyContext: "Zuma-era cabinet appointee",
+    scope: "National (Zuma-era)",
+    individual: "Bathabile Dlamini",
+    role: "Former Social Development Minister",
+    type: "Criminal Charges",
+    description: "Convicted of perjury in 2022 over her testimony in the inquiry into the 2017 SASSA social grants payment crisis. Fined R200,000 (alternative four years imprisonment).",
+    randValue: null,
+    year: 2022,
+    status: "Convicted",
+    sources: [
+      { label: "Johannesburg Magistrate's Court", url: "https://www.judiciary.org.za/" },
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+  {
+    id: "ETH-035",
+    party: "ANC",
+    partyContext: "Zuma-era SABC appointee",
+    scope: "National (Zuma-era)",
+    individual: "Hlaudi Motsoeneng",
+    role: "Former SABC Chief Operating Officer",
+    type: "Personal Enrichment",
+    description: "Public Protector found his appointment irregular and that he fraudulently claimed a matric qualification. Authorised over R11m in irregular salary increases and bonuses to himself. Ordered to repay funds.",
+    randValue: 11400000,
+    year: 2016,
+    status: "Convicted",
+    sources: [
+      { label: "Public Protector — When Governance & Ethics Fail", url: "https://www.pprotect.org/" },
+      { label: "ConCourt Judgment", url: "https://www.concourt.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-036",
+    party: "ANC",
+    partyContext: "Zuma-era cabinet appointee",
+    scope: "National (Zuma-era)",
+    individual: "Malusi Gigaba",
+    role: "Former Finance, Home Affairs & Public Enterprises Minister",
+    type: "Cadre Deployment",
+    description: "Public Protector found he lied under oath in the Fireblade Aviation matter. Zondo Commission made adverse findings on Gupta-linked appointments at Transnet and Eskom during his tenure as Public Enterprises minister.",
+    randValue: null,
+    year: 2018,
+    status: "Alleged",
+    sources: [
+      { label: "Public Protector", url: "https://www.pprotect.org/" },
+      { label: "Zondo Commission", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-037",
+    party: "ANC",
+    partyContext: "Zuma-era cabinet appointee",
+    scope: "National (Zuma-era)",
+    individual: "Lynne Brown",
+    role: "Former Public Enterprises Minister",
+    type: "Cadre Deployment",
+    description: "Zondo Commission found she misled Parliament about the Trillian Capital relationship with Eskom and facilitated state-capture-aligned appointments at Eskom and Transnet boards.",
+    randValue: null,
+    year: 2018,
+    status: "Alleged",
+    sources: [
+      { label: "Zondo Commission Report Part II", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-038",
+    party: "ANC",
+    partyContext: "Zuma-era cabinet appointee",
+    scope: "National (Zuma-era)",
+    individual: "Des van Rooyen",
+    role: "Former Finance Minister (4 days, Dec 2015)",
+    type: "Cadre Deployment",
+    description: "Appointed finance minister for four days in December 2015 in a move that crashed the rand. Zondo Commission found Gupta-linked advisors arrived at Treasury with him. Recommended for criminal investigation.",
+    randValue: null,
+    year: 2015,
+    status: "Alleged",
+    sources: [
+      { label: "Zondo Commission", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-039",
+    party: "ANC",
+    partyContext: "Zuma-era SOE appointee",
+    scope: "National (Zuma-era)",
+    individual: "Lucky Montana",
+    role: "Former CEO, PRASA",
+    type: "Tender Fraud",
+    description: "SIU and Public Protector findings on irregular procurement during his tenure, including the multibillion-rand Spanish Afro 4000 locomotive deal where trains were reportedly too tall for SA's rail network. Multiple matters before NPA.",
+    randValue: 2700000000,
+    year: 2015,
+    status: "Charged",
+    sources: [
+      { label: "SIU", url: "https://www.siu.org.za/" },
+      { label: "Public Protector — Derailed", url: "https://www.pprotect.org/" }
+    ]
+  },
+  {
+    id: "ETH-040",
+    party: "ANC",
+    partyContext: "Zuma-era cabinet appointee",
+    scope: "National (Zuma-era)",
+    individual: "Faith Muthambi",
+    role: "Former Communications & Public Service Minister",
+    type: "Cadre Deployment",
+    description: "Zondo Commission found she leaked confidential cabinet memoranda to the Gupta family and exceeded her authority in restructuring the SABC. Referred for further investigation.",
+    randValue: null,
+    year: 2018,
+    status: "Alleged",
+    sources: [
+      { label: "Zondo Commission", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+  {
+    id: "ETH-041",
+    party: "ANC",
+    partyContext: "Zuma-era SOE appointee",
+    scope: "National (Zuma-era)",
+    individual: "Siyabonga Gama",
+    role: "Former CEO, Transnet",
+    type: "Tender Fraud",
+    description: "Zondo Commission found him implicated in Transnet's R54bn locomotive procurement scandal, including irregular contract variations benefiting Gupta-linked companies. Multiple referrals to NPA.",
+    randValue: 54000000000,
+    year: 2018,
+    status: "Charged",
+    sources: [
+      { label: "Zondo Commission Report Part II", url: "https://www.statecapture.org.za/" }
+    ]
+  },
+
+  /* =====================================================================
+     CURRENT MK PARTY MEMBERS — beyond Zuma.
+     ===================================================================== */
+  {
+    id: "ETH-043",
+    party: "MK Party",
+    partyContext: "Former MK Party MP (resigned 28 Nov 2025); daughter of Jacob Zuma",
+    scope: "National",
+    individual: "Duduzile Zuma-Sambudla",
+    role: "Former MK Party MP",
+    type: "Criminal Charges",
+    description: "Charged in 2024 with incitement to commit public violence over social media posts during the July 2021 KwaZulu-Natal unrest. Resigned as MP on 28 November 2025 amid allegations she duped 17–18 South African men into believing they were attending bodyguard training in Russia, only for them to be deployed to fight in the Russia-Ukraine war. Faces human-trafficking and fraud charges laid by her half-sister.",
+    randValue: null,
+    year: 2024,
+    status: "Charged",
+    sources: [
+      { label: "News24 — Resignation", url: "https://www.news24.com/southafrica/news/duduzile-zuma-sambudla-resigns-from-mk-party-amid-russian-war-recruitment-scandal-20251128-0597" },
+      { label: "Al Jazeera", url: "https://www.aljazeera.com/news/2025/11/29/s-african-ex-leader-zumas-daughter-quits-parliament-over-russia-war-claims" },
+      { label: "CNN", url: "https://www.cnn.com/2025/11/28/africa/zuma-south-africa-ukraine-parliament-intl" },
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/article/2025-11-28-duduzile-zumasambudla-resigns-as-an-mp-a-after-allegedly-duping-party-members-to/" }
+    ]
+  },
+  {
+    id: "ETH-044",
+    party: "MK Party",
+    partyContext: "MK Party MP; former Western Cape Judge President",
+    scope: "National",
+    individual: "John Hlophe",
+    role: "MK Party MP; former Judge President",
+    type: "Criminal Charges",
+    description: "Impeached by Parliament in March 2024 — the first judge removed from office in democratic South Africa — after the JSC found him guilty of gross misconduct for attempting to influence Constitutional Court justices in a Zuma matter.",
+    randValue: null,
+    year: 2024,
+    status: "Convicted",
+    sources: [
+      { label: "JSC Report", url: "https://www.judgesmatter.co.za/" },
+      { label: "ConCourt Judgment", url: "https://www.concourt.org.za/" }
+    ]
+  },
+  /* =====================================================================
+     ADDITIONAL ETHEKWINI WASTEFUL EXPENDITURE — AGSA-flagged matters.
+     ===================================================================== */
+  {
+    id: "ETH-046",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Sewage Infrastructure",
+    role: "Municipal Infrastructure",
+    type: "Infrastructure Failure",
+    description: "Repeated sewage overflows into Durban beaches and waterways after failed routine maintenance. Tens of millions spent on emergency repairs and beach closures, with AGSA flagging avoidable wasteful spending.",
+    randValue: 165000000,
+    year: 2023,
+    status: "Alleged",
+    sources: [
+      { label: "GroundUp", url: "https://www.groundup.org.za/" },
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-047",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Consultants Spend",
+    role: "Municipal Operations",
+    type: "Financial Misconduct",
+    description: "AGSA repeatedly flagged excessive consultant fees where the municipality lacks in-house capacity, despite filled finance and engineering posts. Classified as fruitless and wasteful expenditure.",
+    randValue: 380000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-048",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Interest & Penalties",
+    role: "Municipal Finance",
+    type: "Financial Misconduct",
+    description: "AGSA reported fruitless and wasteful expenditure on interest charges, late-payment penalties, and avoidable legal costs over consecutive audit cycles — money lost to administrative failure rather than service delivery.",
+    randValue: 210000000,
+    year: 2023,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA Report", url: "https://www.agsa.co.za/" }
+    ]
+  },
+  {
+    id: "ETH-049",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Mayoral Inaugurations & Events",
+    role: "Municipal Operations",
+    type: "Financial Misconduct",
+    description: "Reporting raised concerns over inflated event and inauguration spending by successive mayoral offices, including catering, branding, and venue contracts, classified by AGSA as fruitless and wasteful.",
+    randValue: 28000000,
+    year: 2021,
+    status: "Alleged",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/" }
+    ]
+  },
+
+  /* =====================================================================
+     MAJOR ETHEKWINI WASTEFUL EXPENDITURE — verified 2024-2026 reporting.
+     ===================================================================== */
+  {
+    id: "ETH-050",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "GO!Durban Bus Rapid Transit",
+    role: "Capital Project — Public Transport",
+    type: "Infrastructure Failure",
+    description: "More than R8 billion spent over 16 years on the GO!Durban BRT network, with not a single scheduled passenger service operational. National Treasury declared the spend on the KwaMashu-to-Pinetown corridor wasteful and is cutting R8.4 billion from Bus Rapid Transit funding nationally. The City pays close to R5 million per month to guard and clean unused bus stations.",
+    randValue: 8000000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "IOL — R9bn Going Nowhere", url: "https://www.iol.co.za/news/politics/ethekwinis-r9bn-go-durban-transport-project-going-nowhere-as-treasury-threatens-funding-cuts-fdaa5287-ff8a-4cdf-b67b-75e78c9e4ab7" },
+      { label: "The Mercury — Treasury Axes R8.4bn", url: "https://themercury.co.za/business-report/companies/2026-02-26-treasury-axes-r84bn-in-bus-rapid-transit-funding-shifts-billions-to-rail-in-efficiency-drive/" },
+      { label: "Daily Maverick — Sabotage, Taxi Disputes, Mafias", url: "https://www.dailymaverick.co.za/article/2022-02-21-sabotage-taxi-disputes-mafias-durbans-r22bn-bus-plan-lurches-from-one-crisis-to-the-next/" },
+      { label: "IOL — White Elephant", url: "https://www.iol.co.za/dailynews/news/kwazulu-natal/ethekwini-residents-slam-godurban-project-as-a-white-elephant-b934c921-5e61-47ff-b08f-7902557efc05" }
+    ]
+  },
+  {
+    id: "ETH-051",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "GO!Durban — Returned Grant Funds",
+    role: "Capital Project — Public Transport",
+    type: "Financial Misconduct",
+    description: "eThekwini returned R309 million in allocated Public Transport Network Grant funds that the municipality was unable to spend on the stalled GO!Durban BRT programme — funds withheld from service delivery and now lost to the city.",
+    randValue: 309000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "IOL — R309m Returned", url: "https://www.iol.co.za/dailynews/news/kwazulu-natal/ethekwini-returns-r309m-meant-for-godurban-bust-project-42193506" }
+    ]
+  },
+  {
+    id: "ETH-052",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Moses Mabhida Stadium",
+    role: "Municipal Asset",
+    type: "Financial Misconduct",
+    description: "Operating loss of approximately R228 million for FY 2022/23 (R275m expenditure vs R47m revenue). The City approved an additional R284 million for repairs after the original R236m budget was exceeded — total now around R520 million, with completion delayed to 2027. Repairs under scrutiny by the Presidential eThekwini Working Group.",
+    randValue: 520000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "ActionSA — R228m Annual Loss", url: "https://www.actionsa.org.za/moses-mabhida-stadium-operating-at-a-r228-million-annual-loss/" },
+      { label: "Scrolla — R284m More for Repairs", url: "https://scrolla.africa/ethekwini-throws-r284-million-more-at-stadium-repairs/" },
+      { label: "ECR — Presidential Working Group Scrutiny", url: "https://www.ecr.co.za/news/news/moses-mabhida-upgrades-under-scrutiny-pewg/" }
+    ]
+  },
+  {
+    id: "ETH-053",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini EPWP Ghost Workers",
+    role: "Expanded Public Works Programme",
+    type: "Tender Fraud",
+    description: "Public Works Minister suspended eThekwini's EPWP funding for 2026/27 in April 2026 after the Auditor-General found payments to ghost workers, deceased beneficiaries, and double-dipping government employees. Repeat finding since the 2021/22 audit cycle. Earlier cases saw three eThekwini officials arrested for filling EPWP posts with ghost workers paid around R1.2 million for work not done.",
+    randValue: null,
+    year: 2026,
+    status: "Charged",
+    sources: [
+      { label: "News24 — Ghost Workers, Deceased Beneficiaries", url: "https://www.news24.com/politics/ethekwinis-public-works-corruption-ghost-workers-deceased-beneficiaries-sex-for-jobs-20260415-0854" },
+      { label: "TimesLive — Minister Suspends Funds", url: "https://www.timeslive.co.za/news/south-africa/2026-04-14-public-works-minister-suspends-funds-for-ethekwinis-epwp-over-payments-to-ghost-workers/" }
+    ]
+  },
+  {
+    id: "ETH-054",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Water Tanker Networks",
+    role: "Water & Sanitation Department",
+    type: "Tender Fraud",
+    description: "Independent investigations identified 'water tanker mafia' networks in eThekwini: criminal syndicates allegedly securing private tanker contracts through irregular procurement, sabotaging infrastructure to prolong demand, and charging residents up to 15 times the city-set rate. Between 2022 and 2023, eight municipal water-services employees in eThekwini were murdered; officials linked the killings to disputes over lucrative tanker contracts.",
+    randValue: null,
+    year: 2023,
+    status: "Alleged",
+    sources: [
+      { label: "New Lines Institute — Weaponizing Water", url: "https://newlinesinstitute.org/global-security-mil-priorities/weaponizing-water-mafias-in-south-africa/" },
+      { label: "eNCA — eThekwini Employees Under Siege", url: "https://www.enca.com/news-top-stories/water-mafia-ethekwini-water-employees-under-siege" },
+      { label: "Daily Maverick — Water Crisis R19bn Lost", url: "https://www.dailymaverick.co.za/article/2026-04-27-water-crisis-close-to-r19bn-lost-that-could-have-brought-water-into-homes-/" }
+    ]
+  },
+  {
+    id: "ETH-055",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini R6.4bn Irregular Spend",
+    role: "Municipal Government",
+    type: "Audit Outcome",
+    description: "Council scrutiny in May 2026 raised concerns over R6.4 billion in irregular expenditure written off across two financial years. AG report identified top drivers: R2.03 billion from non-compliance with Supply Chain Management local-content rules (85 contracts worth R931 million), R211.88 million from inadequate advertising, R89.84 million from MFMA section 36 breaches.",
+    randValue: 6400000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "IOL — R6.4bn Irregular Spend", url: "https://iol.co.za/business-report/2026-05-20-ethekwini-under-fire-over-r64bn-irregular-spend-as-officials-defend-procurement-failures/" },
+      { label: "PMG — KZN Audit Outcomes", url: "https://pmg.org.za/committee-meeting/39739/" }
+    ]
+  },
+  {
+    id: "ETH-056",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Blacklisted Contractors",
+    role: "Municipal Procurement Crackdown",
+    type: "Tender Fraud",
+    description: "The municipality blacklisted 32 companies from receiving city tenders for fraud, corruption, poor performance, and collusive tendering. A further nine businesses were blacklisted in November 2025. Some had directors who were also state employees (conflict of interest). Eight additional providers blacklisted in September 2024.",
+    randValue: null,
+    year: 2024,
+    status: "Ongoing",
+    sources: [
+      { label: "Scrolla — 32 Companies Blocked", url: "https://scrolla.africa/durban-blocks-32-corrupt-companies-from-city-tenders/" },
+      { label: "Mercury — Nine More Blacklisted", url: "https://themercury.co.za/2025-11-21-ethekwini-municipality-cracking-down-on-fraud-corruption-nine-businesses-blacklisted/" },
+      { label: "IOL — Eight Service Providers Blacklisted", url: "https://iol.co.za/sunday-tribune/news/2024-09-30-ethekwini-municipality-blacklists-eight-more-service-providers-as-part-of-authoritys--crackdown-on-corruption/" }
+    ]
+  },
+  {
+    id: "ETH-057",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini R820m Single-Month Tender Awards",
+    role: "Municipal Procurement",
+    type: "Audit Outcome",
+    description: "eThekwini Municipality council meeting raised concerns after R820 million was disbursed in public tender awards for June 2025 alone, with councillors questioning the transparency and fairness of the procurement process.",
+    randValue: 820000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "IOL — R820m Tender Awards Spark Concerns", url: "https://iol.co.za/news/south-africa/kwazulu-natal/2025-08-07-r820-million-tender-awards-spark-concerns-in-ethekwini-municipality/" }
+    ]
+  },
+  {
+    id: "ETH-058",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Smart Meters Procurement",
+    role: "Electricity Department",
+    type: "Tender Fraud",
+    description: "News24 investigation revealed eThekwini paid approximately R500 million for hundreds of thousands of smart electricity meters that the metro's own pilot project found unusable. Officials selected higher bidders over lower quotes (R2,591/unit vs R1,645/unit). Suspended deputy municipal manager Sibusiso Makhanya named by the City as 'the central character to the unfortunate state of affairs.' Former SCOAG member Haniff Hoosen has characterised the procurement as rigged at finance-head level. Africa Utility Solutions has separately won round one of a R300m damages claim against the City.",
+    randValue: 500000000,
+    year: 2024,
+    status: "Ongoing",
+    sources: [
+      { label: "News24 — Paid R500m for Meters That Don't Work", url: "https://www.news24.com/investigations/ethekwini-paid-r500m-for-smart-electricity-meters-that-dont-work-20240917" },
+      { label: "IOL — Blame Shifts in R500m Meter Scandal", url: "https://www.iol.co.za/the-star/news/blame-shifts-in-r500m-meter-scandal-20465ff5-2293-47a8-9dbb-dc96a7d9920f" },
+      { label: "Daily News — Overpriced Smart Meters", url: "https://dailynews.co.za/news/2025-07-18-fingers-pointed-at-ethekwini-municipality-over-alleged-wasteful-expenditure-on-overpriced-smart-meters/" },
+      { label: "IOL — R300m Smart Meter Lawsuit", url: "https://iol.co.za/news/politics/2025-12-10-ethekwini-municipality-sued-for-r300-million-over-smart-meter-allegations/" },
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-059",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Tokio Marine vs eThekwini (Umlaas Canal)",
+    role: "Stormwater & Flood Infrastructure",
+    type: "Infrastructure Failure",
+    description: "Toyota's Japanese insurer Tokio Marine & Nichido Fire Insurance is suing the eThekwini Municipality, Transnet, and the KZN Department of Transport for R6.5 billion (R4.5bn repairs + R2bn business interruption) over the April 2022 flooding of Toyota's Prospecton plant. The plaintiff alleges the defendants failed in their duty to maintain the Umlaas Canal and diversion berm, the failure of which sent stormwater into the Prospecton Industrial Area. 88% of the production vehicles on site at the time of the flood were written off (approximately 4,000 vehicles), production was halted for over three months, and an estimated 45,000 vehicles of lost output resulted. Toyota subsequently spent R236 million on its own private flood-prevention infrastructure to protect the plant from a recurrence. All three defendants have entered appearances to defend.",
+    randValue: 6500000000,
+    year: 2025,
+    status: "Ongoing",
+    sources: [
+      { label: "SABC News — Toyota Files R6.5bn Lawsuit", url: "https://www.sabcnews.com/sabcnews/toyota-files-r6-5-billion-lawsuit-against-ethekwini-municipality/" },
+      { label: "IOL Mercury — R6.5bn Lawsuit", url: "https://iol.co.za/mercury/2025-06-19-toyota-files-r6-5-billion-lawsuit-against-kzn-government-for-flood-damages/" },
+      { label: "BusinessTech", url: "https://businesstech.co.za/news/business/828661/toyota-going-after-one-of-south-africas-major-provinces-for-r6-5-billion/" },
+      { label: "The Citizen — KZN DOT Builds Legal Team", url: "https://www.citizen.co.za/business/sued-for-r6-5-billion-by-toyota-insurer-kzn-transport-builds-legal-team/" },
+      { label: "Insurance Journal — $361m Claim", url: "https://www.insurancejournal.com/news/international/2025/06/20/828569.htm" },
+      { label: "TopAuto — 88% of Cars Written Off", url: "https://topauto.co.za/features/45185/toyota-south-africa-recovering-after-factory-flood-88-of-cars-written-off/" },
+      { label: "TopAuto — Toyota's R236m Flood Defence", url: "https://topauto.co.za/features/96815/how-toyota-spent-r236-million-to-prevent-another-flood-of-its-south-african-factory/" }
+    ]
+  },
+  {
+    id: "ETH-060",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "April 2022 Floods — Maintenance Failure",
+    role: "Stormwater, Rivers & Drainage",
+    type: "Infrastructure Failure",
+    description: "The April 2022 KZN floods claimed 544 lives province-wide (at least 435 within the eThekwini Metro per Hoosen's compilation, with 54 still recorded as missing), displaced over 40,000 people, destroyed or damaged more than 4,000 homes (≈13,500 within eThekwini per Hoosen's data), and forced around 6,000 families into relocation. KZN-wide infrastructure damage reached around R17 billion; eThekwini's share was approximately R1.4-R1.5 billion. Business Partners estimated total direct and indirect economic losses at around R75 billion, with the South Durban Industrial Basin (≈20,000 jobs, R3bn annual revenue contribution) severely affected. Independent reporting and academic analysis flagged a systemic maintenance failure: rivers and stormwater systems were clogged with debris despite the Municipality spending around R50 million per year since 2009 on a river/stream cleaning programme (see ETH-070), and floodplain bylaws were not consistently enforced — development was permitted within 100-year flood lines. Community leaders reported insufficient official early warning; WhatsApp neighbourhood alerts proved more effective. The Toyota Tokio Marine lawsuit (ETH-059) is the highest-profile downstream consequence.",
+    randValue: 1500000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "Wikipedia — 2022 KZN Floods", url: "https://en.wikipedia.org/wiki/2022_KwaZulu-Natal_floods" },
+      { label: "IOL Mercury — eThekwini R1.5bn Damage", url: "https://www.iol.co.za/mercury/news/ethekwini-metro-floods-affect-6-000-residents-cost-to-repair-infrastructure-damage-is-r1-5-billion-b064db7b-8fe0-411c-a3ec-291965778776" },
+      { label: "The Citizen — Rebuilding", url: "https://www.citizen.co.za/news/south-africa/ethekwini-rebuilds-flood-damaged-infrastructure-after-2022-floods-pics/" },
+      { label: "The Conversation — Climate Disaster Lawsuits", url: "https://theconversation.com/should-governments-pay-businesses-for-climate-disasters-researchers-unpack-huge-lawsuits-in-south-africa-263647" },
+      { label: "World Weather Attribution Report", url: "https://www.worldweatherattribution.org/wp-content/uploads/WWA-KZN-floods-scientific-report.pdf" },
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-061",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Non-Revenue Water (58% losses)",
+    role: "Water & Sanitation Department",
+    type: "Financial Misconduct",
+    description: "eThekwini's non-revenue water peaked at 58.2% (per Daily Maverick / national water department reporting), with 45% lost to direct leaks from transmission pipes, pumps and storage. The financial cost is approximately R2 billion annually in lost revenue — water purchased from bulk supplier Umgeni Water that never reaches a paying customer. The metro pledged R4 billion over 5 years to reduce losses to 25%; figures improved from ~60% (Jan 2024) to 43.5% (Feb 2025) but remain excessive.",
+    randValue: 2000000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "Daily Maverick — 58% Water Loss", url: "https://www.dailymaverick.co.za/article/2023-12-14-government-squeezes-durban-taps-over-citys-failure-to-curb-58-water-loss-rate/" },
+      { label: "ECR — R2bn Annual Losses", url: "https://www.ecr.co.za/news/news/ethekwini-water-losses-total-r2bn-annually-mchunu/" },
+      { label: "Mail & Guardian — Smidgen of Hope", url: "https://mg.co.za/news/2025-03-10-smidgen-of-hope-as-ethekwini-water-losses-decline-but-they-are-still-excessive/" },
+      { label: "Daily Maverick — 40% Lost to Pipe Leaks", url: "https://www.dailymaverick.co.za/article/2024-04-06-billions-down-the-sa-big-city-revenue-drain-as-40-of-purified-water-is-lost-to-pipe-leaks/" },
+      { label: "Daily Maverick — Leakiest Cities Awards", url: "https://www.dailymaverick.co.za/article/2026-04-29-water-down-the-drain-announcing-the-winners-of-sas-leakiest-cities-awards/" }
+    ]
+  },
+
+  /* =====================================================================
+     SCOAG-SOURCED BUDGET & EXPENDITURE CASES.
+     Drawn from analysis by Haniff Hoosen (former member of the Standing
+     Committee on the Auditor-General) cross-referenced with AGSA, the
+     eThekwini 2025 Budget, and independent press reporting where available.
+     ===================================================================== */
+  {
+    id: "ETH-062",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Irregular Expenditure — 5-Year Trend",
+    role: "Municipal Government",
+    type: "Audit Outcome",
+    description: "Per analysis by former SCOAG member Haniff Hoosen drawing on AGSA reporting, eThekwini's irregular expenditure grew from approximately R732 million in the 2019/20 financial year to around R3.9 billion in 2023/24 — a more than five-fold rise in four years. Independent AGSA-disclosed figures confirm the trajectory: R1.5 billion in irregular expenditure exposed in the 2021/22 audit, R780 million in unauthorised expenditure written off, R1.1 billion in UIFW written off, and R3.3 billion still pending investigation (delays in which impair recovery and consequence management).",
+    randValue: 3900000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "AGSA — eThekwini MFMA 2023-24 Profile", url: "https://mfma-2023.agsareports.co.za/municipality/4-ethekwini-metro" },
+      { label: "AGSA — MFMA 2023-24 Consolidated Report (PDF)", url: "https://www.agsa.co.za/Portals/0/Reports/MFMA/2023-24/MFMA%20Report%202023-24%20interactive%20(updated%20August%202025).pdf" },
+      { label: "AGSA — MFMA 2022-23 Consolidated Report (PDF)", url: "https://www.parliament.gov.za/storage/app/media/OISD/Reports/Auditor_General/2024/august/28-08-2024/MFMA_Report_2022-23_FINAL.pdf" },
+      { label: "IOL — AG Exposes R1.5bn Irregular Spend", url: "https://iol.co.za/dailynews/news/2023-02-01-ag-report-exposes-r1-5-billion-in-irregular-expenditure-in-ethekwini/" },
+      { label: "African News Agency — R780m Written Off", url: "https://africannewsagency.com/ethekwini-faces-scrutiny-as-r780-million-in-unauthorised-expenditure-is-written-off/" },
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-063",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "eThekwini Consumer Debt — R35bn",
+    role: "Municipal Revenue Management",
+    type: "Financial Misconduct",
+    description: "Outstanding consumer debt owed to eThekwini grew from around R16 billion in 2021 to approximately R35 billion by April 2025 — the debtors' book grew by R7.9bn in a single year. Household debt makes up R26bn (75%), commercial debt R6.7bn. Water debt alone stands at R14.7bn, driven by undetected underground leaks (see ETH-061) and short payments by insurers. A previous debt-relief programme recovered only R1.3bn against an expected R3.1-R6.3bn. Nearly 5,000 of the municipality's own employees are themselves in arrears on municipal accounts.",
+    randValue: 35000000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "Mercury — R35bn Consumer Debt Crisis", url: "https://themercury.co.za/news/2025-04-24-ethekwini-faces-r35bn-consumer-debt-crisis/" },
+      { label: "DA KZN — Debt Rises to R35bn", url: "https://kzn.da.org.za/2025/04/anc-ifp-eff-run-ethekwini-municipality-debt-increases-to-r35-billion" },
+      { label: "Mercury — 5,000 Employees in Arrears", url: "https://themercury.co.za/2025-04-30-nearly-5000-ethekwini-municipality-employees-fall-behind-on-municipal-payments/" },
+      { label: "IOL — Debt Relief Programme Divided", url: "https://iol.co.za/news/south-africa/kwazulu-natal/2025-05-14-ethekwini-councillors-divided-over-new-debt-relief-programme-for-residents/" },
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-064",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Councillor Bodyguards & VIP Protection",
+    role: "Municipal Security Budget",
+    type: "Financial Misconduct",
+    description: "eThekwini spends approximately R36.7 million per year on private bodyguards (Shark Protection Services: 45 bodyguards, 24 SUVs, 23 drivers, plus a reaction unit) protecting around 22-28 'high-risk' councillors at roughly R208,666 per councillor per month. The City's own analysis indicated an in-house VIP unit would cost R31.8m — a R4.9m saving foregone. At peak periods spending has reached R70 million in three months. Hoosen's SCOAG-informed analysis puts total related security spending across five departments at approximately R541 million.",
+    randValue: 541000000,
+    year: 2024,
+    status: "Alleged",
+    sources: [
+      { label: "IOL — R36m a Year for Bodyguards", url: "https://www.iol.co.za/news/south-africa/kwazulu-natal/bodyguards-cost-ethekwini-r36m-a-year-1834124" },
+      { label: "IOL — R70m in 3 Months", url: "https://www.iol.co.za/news/politics/watch-ethekwini-spends-r70m-to-guard-councillors-in-3-months-amid-political-killings-c3fb911d-ea1b-433f-b0b4-fb8282f780d2" },
+      { label: "News24 — 50 Councillors Guarded 24/7", url: "https://www.news24.com/news24/SouthAfrica/News/50-durban-councillors-guarded-on-24-hour-basis-at-taxpayers-expense-ethekwini-report-20200131" },
+      { label: "IOL — Half-Million Bodyguard Suit Allowances", url: "https://www.iol.co.za/dailynews/news/kwazulu-natal/ethekwini-municipality-parties-question-half-a-million-bodyguards-suit-allowances-0f5d6059-a168-41c1-b92f-b44c20a7fabb" },
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-065",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Failed Investigative Services Contract",
+    role: "Municipal Operations",
+    type: "Financial Misconduct",
+    description: "Per Hoosen's SCOAG-informed analysis of the eThekwini Budget, approximately R21 million was paid roughly three years ago for investigative services that were never delivered to the municipality — a textbook fruitless-and-wasteful classification under MFMA section 1 definitions.",
+    randValue: 21000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-066",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Welfare Programmes — Soup Kitchens & Food Parcels",
+    role: "Municipal Welfare Spend",
+    type: "Financial Misconduct",
+    description: "Per analysis of the eThekwini 2025 Budget by Hoosen (ex-SCOAG), the City spends approximately R118 million per year on soup kitchens and R33 million per year on food parcels — a combined R151 million annual allocation that he characterises as falling within provincial/national welfare mandate (see ETH-069) rather than core municipal service delivery, and questioned on measurable outcomes.",
+    randValue: 151000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" },
+      { label: "eThekwini Municipality — Budget Documents", url: "https://www.durban.gov.za/pages/government/finance/budget" }
+    ]
+  },
+  {
+    id: "ETH-067",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Event Sponsorships — Parties & Fashion Shows",
+    role: "Municipal Operations",
+    type: "Financial Misconduct",
+    description: "Approximately R24 million per year is allocated to event sponsorships including parties and fashion shows, per Hoosen's analysis of the eThekwini Budget — flagged as discretionary spending out of step with the City's service-delivery and infrastructure-maintenance backlogs.",
+    randValue: 24000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-068",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Poverty Alleviation Programme",
+    role: "Municipal Social Services",
+    type: "Financial Misconduct",
+    description: "Approximately R162 million per year is allocated to a poverty-alleviation programme. Per Hoosen's SCOAG-informed analysis, the programme has produced limited measurable outcomes against the spend, and overlaps with provincial Department of Social Development mandates rather than core municipal service delivery.",
+    randValue: 162000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-069",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Unfunded Mandates — R1.2bn/year",
+    role: "Municipal Budget",
+    type: "Financial Misconduct",
+    description: "Per Hoosen's analysis, the City carries approximately R1.2 billion per year in 'unfunded mandates' — expenditure on services that constitutionally fall to provincial or national government but are absorbed onto eThekwini's books, diverting funds from core municipal infrastructure and maintenance. Includes welfare, social services, and housing-related items beyond the constitutional local-government schedule.",
+    randValue: 1200000000,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  },
+  {
+    id: "ETH-070",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "River & Stream Cleaning Programme",
+    role: "Stormwater Maintenance",
+    type: "Infrastructure Failure",
+    description: "The eThekwini river and stream cleaning programme has run since 2009 at approximately R50 million per year, covering ~520 kilometres of waterways via 107 community-based organisations. After 15+ years of programme spend (cumulatively around R750 million), independent post-2022-flood assessments found 'almost every river and stream was overloaded with debris' — directly contributing to the catastrophic April 2022 flooding outcome (ETH-060) and the downstream Tokio Marine lawsuit (ETH-059).",
+    randValue: 750000000,
+    year: 2022,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" },
+      { label: "eThekwini Municipality — Press on Flood Rebuilding", url: "https://www.durban.gov.za/press-statement/EThekwini+Rebuilds+Flood-Damaged+Infrastructure+To+Be+More+Resilient" }
+    ]
+  },
+  {
+    id: "ETH-071",
+    party: "ANC",
+    scope: "eThekwini Metro",
+    individual: "Informal Settlements & Housing Backlog",
+    role: "Human Settlements",
+    type: "Infrastructure Failure",
+    description: "eThekwini has approximately 580 informal settlements housing around 314,000 households, with around 4,000 new informal dwellings added each year through land invasions. At the current rate of formal housing delivery, clearing the existing informal-settlement backlog would take 90+ years — leaving hundreds of thousands of residents on flood-prone, services-deficient land. This structural failure of the human-settlements programme amplifies disaster vulnerability (see ETH-060) and is a major driver of the 2022 flood damage bill.",
+    randValue: null,
+    year: 2025,
+    status: "Alleged",
+    sources: [
+      { label: "Haniff Hoosen — Flood-Proofing a City", url: "https://haniffhoosen.co.za/flood-proofing-a-city/" }
+    ]
+  }
+];
+
+/* === Corruption type list (drives filters & charts) === */
+const TYPES = [
+  "Financial Misconduct",
+  "Tender Fraud",
+  "Cadre Deployment",
+  "Personal Enrichment",
+  "Infrastructure Failure",
+  "Criminal Charges",
+  "Audit Outcome"
+];
+
+/* =====================================================================
+   MK PARTY INSTABILITY — verified timeline of leadership churn.
+   Sources are real article URLs from public reporting.
+   ===================================================================== */
+const MK_INSTABILITY = [
+  {
+    date: "26 Apr 2024",
+    headline: "Founder Jabulani Khumalo expelled",
+    description: "MK Party expelled its own founder Jabulani Khumalo along with Rochelle Davidson, Ray Khumalo, Bheki Manzini and Lebo Moepeng — just weeks before the May 2024 general elections — accusing them of working with 'enemy' forces and accepting bribes to destabilise the party.",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/news24/politics/political-parties/mk-party-expels-rogue-elements-including-party-founder-jabulani-khumalo-20240427" },
+      { label: "The Witness", url: "https://witness.co.za/news/2024/04/27/mk-party-leader-jabulani-khumalo-expelled/" }
+    ]
+  },
+  {
+    date: "May 2024",
+    headline: "Expelled founder suspends Zuma as 'consultant'",
+    description: "In a publicly visible internal implosion, expelled founder Khumalo purported to suspend Jacob Zuma — described as a 'consultant' — even as Zuma was the party's public face going into the elections.",
+    sources: [
+      { label: "News24 — Face vs Founder", url: "https://www.news24.com/politics/face-vs-founder-mk-party-implodes-as-expelled-khumalo-suspends-consultant-zuma-20240507" }
+    ]
+  },
+  {
+    date: "23 Sep 2024",
+    headline: "Khumalo loses bank-account court battle",
+    description: "Gauteng High Court ordered the expelled founder removed as a signatory on the MK Party's Standard Bank account, with a punitive costs order — the first of a series of unsuccessful Khumalo legal challenges.",
+    sources: [
+      { label: "City Press", url: "https://www.news24.com/citypress/politics/expelled-jabulani-khumalo-loses-court-battle-over-party-bank-account-ordered-to-pay-costs-20240923" }
+    ]
+  },
+  {
+    date: "27 May 2025",
+    headline: "Mzwanele Manyi removed as Chief Whip",
+    description: "Mzwanele Manyi was replaced by Colleen Makhubele as Chief Whip — the fourth change in MK's parliamentary leadership since the party's parliamentary debut in mid-2024.",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/article/2025-05-27-colleen-makhubele-new-mk-chief-whip-mzwanele-manyi-removed-in-ongoing-leadership-shifts/" }
+    ]
+  },
+  {
+    date: "17–19 Jun 2025",
+    headline: "Floyd Shivambu axed as Secretary-General",
+    description: "Shivambu was removed as Secretary-General and demoted to ordinary member as a sanction for an unauthorised Easter visit to fugitive Malawian pastor Shepherd Bushiri. Zuma publicly said 'former secretaries did many wrong things.' Shivambu denied wrongdoing, calling the move 'based on a rubbish intelligence report.'",
+    sources: [
+      { label: "Daily Maverick", url: "https://www.dailymaverick.co.za/article/2025-06-17-zuma-on-leadership-shuffle-former-dgs-did-many-wrong-things/" },
+      { label: "TimesLive", url: "https://www.timeslive.co.za/politics/2025-06-19-shivambu-says-he-was-removed-as-mk-party-g-s-based-on-a-rubbish-intelligence-report/" },
+      { label: "IOL — Won't Be an MP Anymore", url: "https://iol.co.za/news/politics/2025-06-19-gloves-off-shivambu-will-not-be-an-mk-party-mp-anymore/" }
+    ]
+  },
+  {
+    date: "8 Aug 2025",
+    headline: "Floyd Shivambu expelled from the party",
+    description: "Formal expulsion letter sent on 15 July; expulsion announced 8 August. MK Party alleged Shivambu had left the organisation R28 million in debt. Shivambu accepted the decision as 'unequivocal and final' and launched the Mayibuye Consultation Process to form a new party, Mayibuye iAfrika.",
+    sources: [
+      { label: "IOL — Expelled", url: "https://iol.co.za/news/politics/2025-08-08-mk-party-expels-former-secretary-general-floyd-shivambu/" },
+      { label: "IOL — R28m Debt Claims", url: "https://iol.co.za/news/south-africa/2025-08-08-floyd-shivambu-expelled-from-mkp-amid-financial-disputes-and-r28m-debt-claims/" },
+      { label: "ECR", url: "https://www.ecr.co.za/news/news/floyd-shivambu-expelled-mk-party/" }
+    ]
+  },
+  {
+    date: "6 Nov 2025",
+    headline: "Deputy President John Hlophe suspended",
+    description: "MK Party suspended its first deputy president and parliamentary leader John Hlophe after an internal dispute. The flashpoint: Hlophe had removed Chief Whip Colleen Makhubele and replaced her with former Zuma-era finance minister Des van Rooyen.",
+    sources: [
+      { label: "EWN", url: "https://www.ewn.co.za/2025/11/06/mk-party-suspends-its-deputy-president-john-hlophe" },
+      { label: "eNCA", url: "https://www.enca.com/news-top-stories/mk-party-suspends-deputy-president-john-hlophe" }
+    ]
+  },
+  {
+    date: "28 Nov 2025",
+    headline: "Duduzile Zuma-Sambudla resigns amid Russia-Ukraine scandal",
+    description: "Jacob Zuma's daughter resigned as MK Party MP following allegations she duped 17–18 young South African men, who believed they were attending bodyguard training in Russia, into being deployed to fight in the Russia-Ukraine war. She faces human-trafficking and fraud charges laid by her half-sister; police are investigating.",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/southafrica/news/duduzile-zuma-sambudla-resigns-from-mk-party-amid-russian-war-recruitment-scandal-20251128-0597" },
+      { label: "Al Jazeera", url: "https://www.aljazeera.com/news/2025/11/29/s-african-ex-leader-zumas-daughter-quits-parliament-over-russia-war-claims" },
+      { label: "CNN", url: "https://www.cnn.com/2025/11/28/africa/zuma-south-africa-ukraine-parliament-intl" }
+    ]
+  },
+  {
+    date: "12 Jan 2026",
+    headline: "Brian Molefe appointed Treasurer-General",
+    description: "Jacob Zuma reshuffled MK leadership: former Eskom/Transnet CEO Brian Molefe — a key Zondo Commission figure — was appointed Treasurer-General, replacing Mpiyakhe Limba. In the same reshuffle, Colleen Makhubele was removed as Chief Whip and replaced by Mmabatho Mokoena-Zondi.",
+    sources: [
+      { label: "Mail & Guardian", url: "https://mg.co.za/politics/2026-01-12-zuma-reshuffles-mk-leadership-brian-molefe-replaces-mpiyakhe-limba-as-treasurer-general/" },
+      { label: "News24", url: "https://www.news24.com/politics/mkp-leadership-changes-brian-molefe-new-tg-colleen-makhubele-booted-out-as-chief-whip-20260112-0844" }
+    ]
+  },
+  {
+    date: "18 Mar 2026",
+    headline: "John Hlophe reinstated as Deputy President",
+    description: "Following an independent legal panel inquiry, Jacob Zuma reinstated John Hlophe as first deputy president and parliamentary leader with immediate effect — four months after his suspension.",
+    sources: [
+      { label: "Mail & Guardian", url: "https://mg.co.za/politics/2026-03-18-mk-party-reinstates-john-hlophe-as-deputy-president-and-parliamentary-leader/" },
+      { label: "The Citizen", url: "https://www.citizen.co.za/news/south-africa/politics/hlophe-reinstated-as-mk-party-deputy-president-and-parliamentary-leader/" }
+    ]
+  },
+  {
+    date: "25 Mar 2026",
+    headline: "MK Party MP arrested for R1.6m tender fraud",
+    description: "Hawks arrested MK Party MP Mandlenkosi Matutu and Joe Gqabi District Municipality water-supply manager Thembelani Ngceba for fraud, corruption and money laundering over a R1.6 million water-pipe tender. Matutu's company Vukabalele Trading was paid in full for water pipes that were never delivered to the Ugie community.",
+    sources: [
+      { label: "News24", url: "https://www.news24.com/southafrica/crime-and-courts/mk-party-mp-charged-with-r16m-water-pipe-tender-fraud-as-residents-face-chronic-shortages-20260325-1262" },
+      { label: "The Citizen", url: "https://www.citizen.co.za/news/south-africa/courts/mk-party-mp-municipal-manager-arrested-r1-6m-tender-scam/" }
+    ]
+  },
+  {
+    date: "Mar 2026",
+    headline: "Eighth Secretary-General appointed in 16 months",
+    description: "Zuma fired Secretary-General Bongani Mncwango and appointed Sibonelo Nomvalo — the eighth person to hold the SG role since the party's 2023 formation. Predecessors include Arthur Zwane, Sihle Ngubane, Sfiso Maseko, Thanduxolo Dyodo and Floyd Shivambu. MK Party Head of the Presidency Magasela Mzobe attributed the churn to the party being built 'in a guerrilla warfare style' rather than through conventional consensus.",
+    sources: [
+      { label: "IOL — Guerrilla Formation", url: "https://iol.co.za/news/politics/2025-12-18-zumas-guerrilla-formation-of-mk-party-has-led-to-leadership-instability-magasela-mzobe/" },
+      { label: "Wikipedia — MK Party", url: "https://en.wikipedia.org/wiki/UMkhonto_weSizwe_Party" }
+    ]
+  }
+];
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+let state = {
+  search: "",
+  party: "All",
+  type: "All",
+  status: "All",
+  scope: "All",
+  yearMin: 2000,
+  yearMax: 2026,
+  sortKey: "year",
+  sortDir: "desc",
+  page: 1,
+  pageSize: 20,
+  individualFilter: null
+};
+
+let charts = {};
+
+/* =========================================================================
+   UTILITIES
+   ========================================================================= */
+function formatRand(v) {
+  if (v === null || v === undefined) return "—";
+  if (v >= 1_000_000_000) return "R" + (v / 1_000_000_000).toFixed(2) + "bn";
+  if (v >= 1_000_000) return "R" + (v / 1_000_000).toFixed(1) + "m";
+  if (v >= 1_000) return "R" + (v / 1_000).toFixed(0) + "k";
+  return "R" + v;
+}
+
+function formatRandFull(v) {
+  if (v === null || v === undefined) return "—";
+  return "R" + v.toLocaleString("en-ZA");
+}
+
+function getFiltered() {
+  let r = CASES.slice();
+  if (state.party !== "All") r = r.filter(c => c.party === state.party);
+  if (state.type !== "All") r = r.filter(c => c.type === state.type);
+  if (state.status !== "All") r = r.filter(c => c.status === state.status);
+  if (state.scope !== "All") r = r.filter(c => (c.scope || "eThekwini Metro") === state.scope);
+  if (state.yearMin) r = r.filter(c => c.year >= state.yearMin);
+  if (state.yearMax) r = r.filter(c => c.year <= state.yearMax);
+  if (state.individualFilter) r = r.filter(c => c.individual === state.individualFilter);
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    r = r.filter(c =>
+      c.individual.toLowerCase().includes(q) ||
+      c.description.toLowerCase().includes(q) ||
+      c.type.toLowerCase().includes(q) ||
+      String(c.year).includes(q) ||
+      c.role.toLowerCase().includes(q)
+    );
+  }
+  r.sort((a, b) => {
+    const k = state.sortKey;
+    let av = a[k], bv = b[k];
+    if (av === null) av = -Infinity;
+    if (bv === null) bv = -Infinity;
+    if (typeof av === "string") { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    if (av < bv) return state.sortDir === "asc" ? -1 : 1;
+    if (av > bv) return state.sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+  return r;
+}
+
+/* =========================================================================
+   HERO STATS — animated counters
+   ========================================================================= */
+function animateNumber(el, target, formatter, duration = 1400) {
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const cur = target * eased;
+    el.textContent = formatter(cur, t);
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function renderHeroStats() {
+  const filtered = getFiltered();
+  const totalCases = filtered.length;
+  const totalRand = filtered.reduce((s, c) => s + (c.randValue || 0), 0);
+  const totalIndiv = new Set(filtered.map(c => c.individual)).size;
+
+  animateNumber(document.getElementById("stat-cases"), totalCases, (v) => Math.round(v).toString());
+  animateNumber(document.getElementById("stat-individuals"), totalIndiv, (v) => Math.round(v).toString());
+  animateNumber(document.getElementById("stat-rand"), totalRand, (v) => {
+    if (v >= 1e9) return "R" + (v / 1e9).toFixed(1) + "bn";
+    if (v >= 1e6) return "R" + (v / 1e6).toFixed(0) + "m";
+    return "R" + Math.round(v).toLocaleString();
+  });
+}
+
+/* =========================================================================
+   SUMMARY CARDS
+   ========================================================================= */
+function renderSummary() {
+  const filtered = getFiltered();
+  const irreg = filtered.filter(c => c.type === "Audit Outcome").reduce((s, c) => s + (c.randValue || 0), 0);
+  const fruitless = filtered.filter(c => c.type === "Financial Misconduct").reduce((s, c) => s + (c.randValue || 0), 0);
+  const tenderCount = filtered.filter(c => c.type === "Tender Fraud").length;
+  const convictions = filtered.filter(c => c.status === "Convicted").length;
+
+  const cards = [
+    { label: "Irregular Expenditure (AG)", value: formatRand(irreg), note: "Reported across audit cycles" },
+    { label: "Fruitless & Wasteful", value: formatRand(fruitless), note: "Penalties, interest, avoidable spend" },
+    { label: "Tender-Fraud Cases", value: tenderCount, note: "Procurement-related matters" },
+    { label: "Criminal Convictions", value: convictions, note: "Court-confirmed verdicts" }
+  ];
+  const html = cards.map(c => `
+    <div class="summary-card">
+      <div class="sc-label">${c.label}</div>
+      <div class="sc-value">${c.value}</div>
+      <div class="sc-note">${c.note}</div>
+    </div>
+  `).join("");
+  document.getElementById("summaryCards").innerHTML = html;
+}
+
+/* =========================================================================
+   CHARTS
+   ========================================================================= */
+/* Theme-aware chart colours — read live from CSS custom properties so a
+   dark-mode toggle simply re-renders with the new palette. */
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function hexA(hex, a) {
+  hex = (hex || "").replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map(x => x + x).join("");
+  const n = parseInt(hex, 16);
+  if (isNaN(n)) return `rgba(120,120,140,${a})`;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function getChartColors() {
+  return {
+    primary: cssVar("--dv-blue"),
+    primaryDark: cssVar("--primary-dark"),
+    danger: cssVar("--dv-red"),
+    warning: cssVar("--dv-mk"),
+    neutralDark: cssVar("--dv-anc"),
+    accent: cssVar("--accent"),
+    grey: cssVar("--ink-faint"),
+    surface: cssVar("--surface"),
+    grid: cssVar("--dv-grid"),
+    text: cssVar("--dv-text")
+  };
+}
+
+Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+
+function renderCharts() {
+  const data = getFiltered();
+  const CHART_COLORS = getChartColors();
+  Chart.defaults.color = CHART_COLORS.text;
+  Chart.defaults.borderColor = CHART_COLORS.grid;
+
+  Object.values(charts).forEach(c => c && c.destroy && c.destroy());
+  charts = {};
+
+  // A: cases by party & type
+  const partyTypeMatrix = TYPES.map(t => ({
+    type: t,
+    ANC: data.filter(c => c.party === "ANC" && c.type === t).length,
+    MK: data.filter(c => c.party === "MK Party" && c.type === t).length
+  }));
+  charts.A = new Chart(document.getElementById("chartA"), {
+    type: "bar",
+    data: {
+      labels: partyTypeMatrix.map(r => r.type),
+      datasets: [
+        { label: "ANC", data: partyTypeMatrix.map(r => r.ANC), backgroundColor: CHART_COLORS.neutralDark },
+        { label: "MK Party", data: partyTypeMatrix.map(r => r.MK), backgroundColor: CHART_COLORS.warning }
+      ]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // B: cases by type
+  const typeCounts = TYPES.map(t => ({ type: t, n: data.filter(c => c.type === t).length }))
+    .sort((a, b) => b.n - a.n);
+  charts.B = new Chart(document.getElementById("chartB"), {
+    type: "bar",
+    data: {
+      labels: typeCounts.map(t => t.type),
+      datasets: [{
+        label: "Cases",
+        data: typeCounts.map(t => t.n),
+        backgroundColor: CHART_COLORS.primary
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+        x: { ticks: { autoSkip: false, maxRotation: 35, minRotation: 35, font: { size: 10 } } }
+      }
+    }
+  });
+
+  // C: timeline
+  const years = [];
+  const yMin = Math.min(...data.map(c => c.year), 2018);
+  const yMax = Math.max(...data.map(c => c.year), 2026);
+  for (let y = yMin; y <= yMax; y++) years.push(y);
+  const ancSeries = years.map(y => data.filter(c => c.year === y && c.party === "ANC").length);
+  const mkSeries = years.map(y => data.filter(c => c.year === y && c.party === "MK Party").length);
+  charts.C = new Chart(document.getElementById("chartC"), {
+    type: "line",
+    data: {
+      labels: years,
+      datasets: [
+        { label: "ANC", data: ancSeries, borderColor: CHART_COLORS.primary, backgroundColor: hexA(CHART_COLORS.primary, 0.14), tension: 0.3, fill: true, pointRadius: 2, pointHoverRadius: 5 },
+        { label: "MK Party", data: mkSeries, borderColor: CHART_COLORS.warning, backgroundColor: hexA(CHART_COLORS.warning, 0.14), tension: 0.3, fill: true, pointRadius: 2, pointHoverRadius: 5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // D: status donut
+  const statuses = ["Alleged", "Charged", "Convicted", "Dismissed", "Ongoing"];
+  const statusCounts = statuses.map(s => data.filter(c => c.status === s).length);
+  charts.D = new Chart(document.getElementById("chartD"), {
+    type: "doughnut",
+    data: {
+      labels: statuses,
+      datasets: [{
+        data: statusCounts,
+        backgroundColor: [CHART_COLORS.grey, CHART_COLORS.warning, CHART_COLORS.danger, cssVar("--success"), CHART_COLORS.primary],
+        borderWidth: 2,
+        borderColor: CHART_COLORS.surface
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: "62%",
+      plugins: {
+        legend: { position: "bottom" },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} cases` } }
+      }
+    }
+  });
+
+  // E: rand by category
+  const randByType = TYPES.map(t => ({
+    type: t,
+    total: data.filter(c => c.type === t).reduce((s, c) => s + (c.randValue || 0), 0)
+  })).sort((a, b) => b.total - a.total);
+  charts.E = new Chart(document.getElementById("chartE"), {
+    type: "bar",
+    data: {
+      labels: randByType.map(r => r.type),
+      datasets: [{
+        data: randByType.map(r => r.total),
+        backgroundColor: CHART_COLORS.danger,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => formatRand(ctx.parsed.y) } }
+      },
+      scales: {
+        y: { ticks: { callback: v => formatRand(v) } },
+        x: { ticks: { autoSkip: false, maxRotation: 35, minRotation: 35, font: { size: 10 } } }
+      }
+    }
+  });
+
+  // F: top individuals
+  const indivCounts = {};
+  data.forEach(c => { indivCounts[c.individual] = (indivCounts[c.individual] || 0) + 1; });
+  const topIndiv = Object.entries(indivCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  charts.F = new Chart(document.getElementById("chartF"), {
+    type: "bar",
+    data: {
+      labels: topIndiv.map(r => r[0]),
+      datasets: [{
+        data: topIndiv.map(r => r[1]),
+        backgroundColor: CHART_COLORS.primary,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      onClick: (e, els) => {
+        if (els.length) {
+          const name = topIndiv[els[0].index][0];
+          state.individualFilter = name;
+          state.page = 1;
+          renderAll();
+          document.getElementById("cases").scrollIntoView({ behavior: "smooth" });
+        }
+      }
+    }
+  });
+
+}
+
+/* =========================================================================
+   TABLE
+   ========================================================================= */
+function renderTable() {
+  const filtered = getFiltered();
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / state.pageSize));
+  if (state.page > pages) state.page = pages;
+  const start = (state.page - 1) * state.pageSize;
+  const slice = filtered.slice(start, start + state.pageSize);
+
+  document.getElementById("tableCount").innerHTML = `Showing <strong>${slice.length}</strong> of <strong>${total}</strong> cases`;
+  document.getElementById("resultCount").innerHTML = `Showing <strong>${total}</strong> of <strong>${CASES.length}</strong> cases`;
+
+  const html = slice.map(c => {
+    const partyBadge = c.party === "ANC"
+      ? `<span class="badge badge-anc">ANC</span>`
+      : `<span class="badge badge-mk">MK</span>`;
+    const scopeClass = c.scope && c.scope.startsWith("eThekwini") ? "badge-scope badge-scope-ethekwini" : "badge-scope";
+    const scopeBadge = c.scope ? `<span class="${scopeClass}">${c.scope}</span>` : "";
+    const contextNote = c.partyContext ? `<span class="context-note">${c.partyContext}</span>` : "";
+    const sources = c.sources.map((s, i) => `<a href="${s.url}" target="_blank" rel="noopener" title="${s.label}" onclick="event.stopPropagation()">🔗</a>`).join("");
+    const fullSources = c.sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${s.label} ↗</a>`).join("");
+    return `
+      <tr onclick="toggleExpand('${c.id}')">
+        <td class="case-id"><span class="row-caret">›</span>${c.id}</td>
+        <td>${partyBadge}${contextNote}</td>
+        <td class="individual">${c.individual}<span class="role">${c.role}</span></td>
+        <td><span class="badge badge-type">${c.type}</span>${scopeBadge}</td>
+        <td>${c.description.slice(0, 110)}${c.description.length > 110 ? "…" : ""}</td>
+        <td class="rand">${formatRand(c.randValue)}</td>
+        <td>${c.year}</td>
+        <td><span class="badge badge-status-${c.status}">${c.status}</span></td>
+        <td class="sources">${sources}</td>
+      </tr>
+      <tr class="expand-row" id="exp-${c.id}">
+        <td colspan="9">
+          <h4>${c.individual} <span style="color:var(--neutral-mid); font-weight:400;">— ${c.role}</span></h4>
+          ${c.partyContext ? `<p class="affiliation-note"><strong>Affiliation context:</strong> ${c.partyContext}</p>` : ""}
+          <p>${c.description}</p>
+          <p style="margin-top:8px; font-size:var(--text-xs); color:var(--neutral-mid);">
+            <strong>Case ID:</strong> ${c.id} &nbsp;·&nbsp;
+            <strong>Scope:</strong> ${c.scope || "eThekwini Metro"} &nbsp;·&nbsp;
+            <strong>Year:</strong> ${c.year} &nbsp;·&nbsp;
+            <strong>Status:</strong> ${c.status} &nbsp;·&nbsp;
+            <strong>Amount:</strong> ${formatRandFull(c.randValue)}
+          </p>
+          <div class="src-list"><strong style="font-size:var(--text-xs); color:var(--neutral-mid);">SOURCES:</strong><br>${fullSources}</div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+  document.getElementById("casesBody").innerHTML = html || `<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--neutral-mid);">No cases match the current filters.</td></tr>`;
+
+  renderPagination(pages);
+}
+
+function toggleExpand(id) {
+  const row = document.getElementById("exp-" + id);
+  if (!row) return;
+  row.classList.toggle("open");
+  const main = row.previousElementSibling;
+  if (main) main.classList.toggle("expanded");
+}
+
+function renderPagination(pages) {
+  const container = document.getElementById("pagination");
+  if (pages <= 1) { container.innerHTML = ""; return; }
+  let html = `<button onclick="goPage(${state.page - 1})" ${state.page === 1 ? "disabled" : ""}>‹</button>`;
+  for (let i = 1; i <= pages; i++) {
+    html += `<button class="${i === state.page ? "active" : ""}" onclick="goPage(${i})">${i}</button>`;
+  }
+  html += `<button onclick="goPage(${state.page + 1})" ${state.page === pages ? "disabled" : ""}>›</button>`;
+  container.innerHTML = html;
+}
+
+function goPage(n) {
+  state.page = n;
+  renderTable();
+  document.getElementById("cases").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* =========================================================================
+   FILTERS / CHIPS
+   ========================================================================= */
+function renderChips() {
+  const chips = [];
+  if (state.party !== "All") chips.push({ key: "party", val: state.party, label: "Party: " + state.party });
+  if (state.type !== "All") chips.push({ key: "type", val: state.type, label: "Type: " + state.type });
+  if (state.status !== "All") chips.push({ key: "status", val: state.status, label: "Status: " + state.status });
+  if (state.scope !== "All") chips.push({ key: "scope", val: state.scope, label: "Scope: " + state.scope });
+  if (state.search) chips.push({ key: "search", val: "", label: "Search: " + state.search });
+  if (state.individualFilter) chips.push({ key: "individualFilter", val: null, label: "Individual: " + state.individualFilter });
+  if (state.yearMin > 2000 || state.yearMax < 2026) chips.push({ key: "yearRange", val: "", label: `Years: ${state.yearMin}–${state.yearMax}` });
+
+  document.getElementById("activeChips").innerHTML = chips.map(c =>
+    `<span class="chip" onclick="clearFilter('${c.key}')">${c.label}</span>`
+  ).join("");
+}
+
+function clearFilter(key) {
+  if (key === "party") { state.party = "All"; document.getElementById("filterParty").value = "All"; setActivePartyPill("All"); }
+  if (key === "type") { state.type = "All"; document.getElementById("filterType").value = "All"; }
+  if (key === "status") { state.status = "All"; document.getElementById("filterStatus").value = "All"; }
+  if (key === "scope") { state.scope = "All"; document.getElementById("filterScope").value = "All"; }
+  if (key === "search") { state.search = ""; document.getElementById("search").value = ""; }
+  if (key === "individualFilter") { state.individualFilter = null; }
+  if (key === "yearRange") {
+    state.yearMin = 2000; state.yearMax = 2026;
+    document.getElementById("yearMin").value = 2000;
+    document.getElementById("yearMax").value = 2026;
+    document.getElementById("yearMinLabel").textContent = 2000;
+    document.getElementById("yearMaxLabel").textContent = 2026;
+  }
+  state.page = 1;
+  renderAll();
+}
+
+function resetAllFilters() {
+  state.party = "All"; state.type = "All"; state.status = "All"; state.scope = "All";
+  state.search = ""; state.individualFilter = null;
+  state.yearMin = 2000; state.yearMax = 2026; state.page = 1;
+  document.getElementById("filterParty").value = "All";
+  document.getElementById("filterType").value = "All";
+  document.getElementById("filterStatus").value = "All";
+  document.getElementById("filterScope").value = "All";
+  document.getElementById("search").value = "";
+  document.getElementById("yearMin").value = 2000;
+  document.getElementById("yearMax").value = 2026;
+  document.getElementById("yearMinLabel").textContent = 2000;
+  document.getElementById("yearMaxLabel").textContent = 2026;
+  setActivePartyPill("All");
+  renderAll();
+}
+
+function setActivePartyPill(party) {
+  document.querySelectorAll(".pill").forEach(p => p.classList.toggle("active", p.dataset.party === party));
+}
+
+/* =========================================================================
+   MK INSTABILITY TIMELINE
+   ========================================================================= */
+function renderInstability() {
+  const html = MK_INSTABILITY.map(item => `
+    <div class="timeline-item">
+      <div class="timeline-date">${item.date}</div>
+      <div class="timeline-headline">${item.headline}</div>
+      <div class="timeline-desc">${item.description}</div>
+      <div class="timeline-sources">
+        ${item.sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${s.label} ↗</a>`).join("")}
+      </div>
+    </div>
+  `).join("");
+  document.getElementById("timeline").innerHTML = html;
+  document.getElementById("instab-events").textContent = MK_INSTABILITY.length;
+}
+
+/* =========================================================================
+   CSV EXPORT
+   ========================================================================= */
+function exportCSV() {
+  const data = getFiltered();
+  const headers = ["Case ID", "Party", "Affiliation Context", "Scope", "Individual", "Role", "Type", "Description", "Rand Value", "Year", "Status", "Sources"];
+  const rows = data.map(c => [
+    c.id, c.party,
+    `"${(c.partyContext || "").replace(/"/g, '""')}"`,
+    c.scope || "eThekwini Metro",
+    `"${c.individual.replace(/"/g, '""')}"`,
+    `"${c.role.replace(/"/g, '""')}"`,
+    c.type,
+    `"${c.description.replace(/"/g, '""')}"`,
+    c.randValue || "",
+    c.year, c.status,
+    `"${c.sources.map(s => s.label + ": " + s.url).join(" | ")}"`
+  ]);
+  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ethekwini-reckoning-${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* =========================================================================
+   POPULATE FILTERS, BIND EVENTS
+   ========================================================================= */
+function populateFilters() {
+  const typeSel = document.getElementById("filterType");
+  TYPES.forEach(t => {
+    const o = document.createElement("option");
+    o.value = t; o.textContent = t;
+    typeSel.appendChild(o);
+  });
+}
+
+function bindEvents() {
+  document.getElementById("search").addEventListener("input", e => {
+    state.search = e.target.value.trim();
+    state.page = 1;
+    renderAll();
+  });
+  document.getElementById("filterType").addEventListener("change", e => {
+    state.type = e.target.value; state.page = 1; renderAll();
+  });
+  document.getElementById("filterStatus").addEventListener("change", e => {
+    state.status = e.target.value; state.page = 1; renderAll();
+  });
+  document.getElementById("filterParty").addEventListener("change", e => {
+    state.party = e.target.value; setActivePartyPill(state.party); state.page = 1; renderAll();
+  });
+  document.getElementById("filterScope").addEventListener("change", e => {
+    state.scope = e.target.value; state.page = 1; renderAll();
+  });
+  document.getElementById("yearMin").addEventListener("input", e => {
+    let v = +e.target.value;
+    if (v > state.yearMax) v = state.yearMax;
+    state.yearMin = v;
+    e.target.value = v;
+    document.getElementById("yearMinLabel").textContent = v;
+    state.page = 1; renderAll();
+  });
+  document.getElementById("yearMax").addEventListener("input", e => {
+    let v = +e.target.value;
+    if (v < state.yearMin) v = state.yearMin;
+    state.yearMax = v;
+    e.target.value = v;
+    document.getElementById("yearMaxLabel").textContent = v;
+    state.page = 1; renderAll();
+  });
+
+  document.querySelectorAll(".pill").forEach(p => {
+    p.addEventListener("click", () => {
+      state.party = p.dataset.party;
+      document.getElementById("filterParty").value = state.party;
+      setActivePartyPill(state.party);
+      state.page = 1; renderAll();
+    });
+  });
+
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.sort;
+      if (state.sortKey === k) state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+      else { state.sortKey = k; state.sortDir = "asc"; }
+      document.querySelectorAll("th").forEach(x => x.classList.remove("sorted-asc", "sorted-desc"));
+      th.classList.add(state.sortDir === "asc" ? "sorted-asc" : "sorted-desc");
+      renderTable();
+    });
+  });
+
+  document.querySelectorAll(".nav-links a").forEach(a => {
+    a.addEventListener("click", () => document.querySelector(".nav-links").classList.remove("open"));
+  });
+}
+
+/* =========================================================================
+   THEME (dark mode)
+   ========================================================================= */
+function setupTheme() {
+  const btn = document.getElementById("themeToggle");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("er-theme", next); } catch (e) {}
+    // Re-render charts so they pick up the new palette.
+    renderCharts();
+  });
+}
+
+/* =========================================================================
+   UX — scroll progress, back-to-top, scroll-reveal
+   ========================================================================= */
+function setupUX() {
+  const progress = document.getElementById("progress");
+  const toTop = document.getElementById("toTop");
+
+  function onScroll() {
+    const h = document.documentElement;
+    const scrolled = h.scrollTop;
+    const height = h.scrollHeight - h.clientHeight;
+    const pct = height > 0 ? (scrolled / height) * 100 : 0;
+    if (progress) progress.style.width = pct + "%";
+    if (toTop) toTop.classList.toggle("show", scrolled > 600);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  if (toTop) {
+    toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
+
+  // Reveal-on-scroll for cards and panels.
+  const targets = document.querySelectorAll(
+    ".summary-card, .chart-card, .timeline-item, .instab-stat, .table-wrap, .methodology, .hero-promise"
+  );
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
+    targets.forEach(t => { t.classList.add("reveal"); io.observe(t); });
+  }
+}
+
+/* =========================================================================
+   MASTER RENDER
+   ========================================================================= */
+function renderAll() {
+  renderChips();
+  renderSummary();
+  renderHeroStats();
+  renderCharts();
+  renderTable();
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("lastUpdated").textContent = new Date().toISOString().split("T")[0];
+  populateFilters();
+  renderInstability();
+  bindEvents();
+  setupTheme();
+  renderAll();
+  setupUX();
+});
+</script>
+</body>
+</html>
