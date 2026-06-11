@@ -901,6 +901,13 @@ nav {
 .hero-promise svg { width: 20px; height: 20px; color: var(--primary); flex-shrink: 0; margin-top: 1px; }
 .hero-promise strong { color: var(--neutral-dark); font-weight: 600; }
 .hero-controls { display: flex; flex-direction: column; gap: 12px; }
+.bloc-note {
+  background: color-mix(in srgb, var(--mk) 8%, var(--surface));
+  border: 1px solid var(--border); border-left: 3px solid var(--mk);
+  border-radius: var(--radius-md); padding: 14px 16px;
+  font-size: .92rem; color: var(--neutral-mid); line-height: 1.55; max-width: 820px;
+}
+.bloc-note strong { color: var(--neutral-dark); font-weight: 600; }
 .control-label { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
 .party-pills { gap: 10px; }
 .pill {
@@ -988,6 +995,7 @@ td.rand { color: var(--neutral-dark); }
 /* ---- Badges (theme-aware via color-mix) ---- */
 .badge-anc { background: var(--neutral-dark); color: var(--surface); }
 .badge-mk { background: var(--mk); color: #fff; }
+.badge-bloc { background: var(--btn-bg); color: #fff; letter-spacing: .01em; }
 .badge-type { background: var(--accent); color: var(--primary); }
 .badge-scope { background: color-mix(in srgb, var(--gold) 18%, transparent); color: var(--gold); }
 .badge-scope-ethekwini { background: var(--accent); color: var(--primary); }
@@ -1141,12 +1149,9 @@ footer { background: var(--footer-bg); }
     </div>
 
     <div class="hero-controls">
-      <span class="control-label">Filter the entire dashboard by party</span>
-      <div class="party-pills" id="partyPills">
-        <button class="pill active" data-party="All">All Parties</button>
-        <button class="pill" data-party="ANC">ANC</button>
-        <button class="pill" data-party="MK Party">MK Party</button>
-      </div>
+      <p class="bloc-note">
+        <strong>One bloc, two names.</strong> This dashboard counts the <strong>ANC</strong> and the <strong>MK Party</strong> as a single accountability bloc — they share founders, leaders and personnel. Jacob Zuma led the ANC before founding and leading MK; Brian Molefe moved from Zuma-era state enterprises into MK's leadership; and the state-capture-era appointees documented here served under the ANC. They remain distinct, rival parties at the ballot box — each case below names the party involved — but the dashboard counts their corruption as one bloc and the totals cannot be filtered or split between them.
+      </p>
     </div>
   </div>
 </header>
@@ -1156,11 +1161,11 @@ footer { background: var(--footer-bg); }
     <div class="section-head">
       <span class="section-kicker">Explore the record</span>
       <h2 class="section-title">Search &amp; filter every case</h2>
-      <p class="section-sub">Free-text search across names, roles and descriptions, then narrow by type, status, party, scope and year. The hero counters and every chart below update live with your filters.</p>
+      <p class="section-sub">Free-text search across names, roles and descriptions, then narrow by type, status, scope and year. ANC and MK are counted as one bloc and cannot be filtered apart. The hero counters and every chart below update live with your filters.</p>
     </div>
 
     <div class="filter-bar">
-      <div class="filter-row">
+      <div class="filter-row" style="grid-template-columns: 2fr 1fr 1fr;">
         <div class="filter-group">
           <label for="search">Search</label>
           <input type="text" id="search" placeholder="Name, type, description, year…" />
@@ -1180,14 +1185,6 @@ footer { background: var(--footer-bg); }
             <option>Convicted</option>
             <option>Dismissed</option>
             <option>Ongoing</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="filterParty">Party</label>
-          <select id="filterParty">
-            <option value="All">All Parties</option>
-            <option>ANC</option>
-            <option>MK Party</option>
           </select>
         </div>
       </div>
@@ -1227,13 +1224,13 @@ footer { background: var(--footer-bg); }
     <div class="section-head">
       <span class="section-kicker">The patterns</span>
       <h2 class="section-title">What the data shows when you stack it</h2>
-      <p class="section-sub">Six views of the same record — by party and type, by category, across time, by legal status, by rand value, and by the individuals and entities named most often. All charts respond to the filters above.</p>
+      <p class="section-sub">Six views of the same record — the ANC/MK bloc by scope, by category, across time, by legal status, by rand value, and by the individuals and entities named most often. In every chart the two parties are counted as one bloc and are never split apart. All charts respond to the filters above.</p>
     </div>
 
     <div class="charts-grid">
       <div class="chart-card">
-        <h3>Cases by Party &amp; Type</h3>
-        <p class="chart-note">Grouped horizontal bars — ANC vs MK Party, by corruption category.</p>
+        <h3>Cases by scope</h3>
+        <p class="chart-note">Local eThekwini matters vs national (Zuma-era) state-capture matters across the bloc.</p>
         <div class="chart-wrap"><canvas id="chartA"></canvas></div>
       </div>
       <div class="chart-card">
@@ -1243,7 +1240,7 @@ footer { background: var(--footer-bg); }
       </div>
       <div class="chart-card">
         <h3>Timeline of Incidents</h3>
-        <p class="chart-note">Incidents per year. MK Party was founded in December 2023.</p>
+        <p class="chart-note">Documented incidents per year across the ANC/MK bloc.</p>
         <div class="chart-wrap"><canvas id="chartC"></canvas></div>
       </div>
       <div class="chart-card">
@@ -1340,6 +1337,7 @@ footer { background: var(--footer-bg); }
           <li>Investigative journalism by <em>Daily Maverick</em>, <em>amaBhungane</em>, <em>News24</em>, <em>City Press</em>, <em>GroundUp</em>, <em>TimesLive</em>, <em>Mail &amp; Guardian</em>, <em>SABC News</em>, the <em>Mercury</em> and others, plus international wires (CNN, Al Jazeera, Insurance Journal) on matters of global reach</li>
         </ul>
         <p><strong>Status labels.</strong> Cases are marked conservatively. "Alleged" means publicly reported but not yet criminally charged. "Charged" means formal NPA charges have been laid. "Convicted" means a court has handed down a guilty verdict (including civil court findings of constitutional violation or delinquent-director declarations). "Dismissed" means removed from office. "Ongoing" means matter is before court but unresolved.</p>
+        <p><strong>One accountability bloc.</strong> This dashboard counts the ANC and the MK Party together as a single accountability bloc, and the headline totals, summary cards and charts treat them as one. The rationale is personnel overlap, not electoral alliance: the MK Party was founded in 2023 largely by former ANC members; Jacob Zuma led the ANC before founding and leading MK; Brian Molefe moved from Zuma-era state-owned enterprises into MK's leadership; and the state-capture-era appointees documented here served under the ANC. The two are distinct, rival parties at the ballot box, so this grouping is an explicit <em>editorial framing</em> — not a claim that they are one organisation. Because the bloc is treated as a single unit, the dashboard's aggregates — the hero totals, summary cards and every chart — are never split between ANC and MK, and there is no party filter. The case table does identify each individual's specific party (ANC or MK) and retains their sourced role and affiliation history, but the bloc's totals cannot be broken down or filtered by party.</p>
         <p><strong>Party attribution.</strong> Cases are attributed to the individual's <em>current</em> political party. Jacob Zuma and Brian Molefe — who served under the ANC but currently hold MK Party leadership positions — are listed as <strong>MK Party</strong>, with an explicit "Affiliation context" note clarifying that the alleged conduct occurred during their ANC tenure. Corruption under Zuma's presidency by people he appointed who have <em>not</em> moved to MK remain attributed to the ANC (the party they served under) but tagged as <strong>"National (Zuma-era)"</strong> in scope.</p>
         <p><strong>Currency of MK Party membership.</strong> Floyd Shivambu is <em>not</em> included in the case database because he was expelled from the MK Party on 8 August 2025 and is no longer a member. Duduzile Zuma-Sambudla is listed as a <em>former</em> MK Party MP — she resigned on 28 November 2025 amid the Russia-Ukraine recruitment scandal. The MK Instability section below documents these and other leadership changes with sources.</p>
         <p><strong>Scope.</strong> Each case is tagged either <strong>"eThekwini Metro"</strong> (local-government corruption and wasteful expenditure) or <strong>"National (Zuma-era)" / "National"</strong> (state-capture-era matters by Zuma or his presidential appointees, and conduct by current MK Party figures). Both are relevant to eThekwini voters because the political figures involved either currently lead a party contesting eThekwini or shaped the institutions that govern it.</p>
@@ -2806,26 +2804,24 @@ function renderCharts() {
   Object.values(charts).forEach(c => c && c.destroy && c.destroy());
   charts = {};
 
-  // A: cases by party & type
-  const partyTypeMatrix = TYPES.map(t => ({
-    type: t,
-    ANC: data.filter(c => c.party === "ANC" && c.type === t).length,
-    MK: data.filter(c => c.party === "MK Party" && c.type === t).length
-  }));
+  // A: cases by scope (local vs national) — the bloc is never split by party
+  const SCOPE_DEFS = [
+    { key: "eThekwini Metro", label: "eThekwini Metro" },
+    { key: "National (Zuma-era)", label: "National · Zuma-era" },
+    { key: "National", label: "National · current" }
+  ];
+  const scopeCounts = SCOPE_DEFS.map(s => data.filter(c => (c.scope || "eThekwini Metro") === s.key).length);
   charts.A = new Chart(document.getElementById("chartA"), {
     type: "bar",
     data: {
-      labels: partyTypeMatrix.map(r => r.type),
-      datasets: [
-        { label: "ANC", data: partyTypeMatrix.map(r => r.ANC), backgroundColor: CHART_COLORS.neutralDark },
-        { label: "MK Party", data: partyTypeMatrix.map(r => r.MK), backgroundColor: CHART_COLORS.warning }
-      ]
+      labels: SCOPE_DEFS.map(s => s.label),
+      datasets: [{ label: "Cases", data: scopeCounts, backgroundColor: CHART_COLORS.primary, borderRadius: 4 }]
     },
     options: {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
+      plugins: { legend: { display: false } },
       scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
@@ -2858,20 +2854,19 @@ function renderCharts() {
   const yMin = Math.min(...data.map(c => c.year), 2018);
   const yMax = Math.max(...data.map(c => c.year), 2026);
   for (let y = yMin; y <= yMax; y++) years.push(y);
-  const ancSeries = years.map(y => data.filter(c => c.year === y && c.party === "ANC").length);
-  const mkSeries = years.map(y => data.filter(c => c.year === y && c.party === "MK Party").length);
+  const totalSeries = years.map(y => data.filter(c => c.year === y).length);
   charts.C = new Chart(document.getElementById("chartC"), {
     type: "line",
     data: {
       labels: years,
       datasets: [
-        { label: "ANC", data: ancSeries, borderColor: CHART_COLORS.primary, backgroundColor: hexA(CHART_COLORS.primary, 0.14), tension: 0.3, fill: true, pointRadius: 2, pointHoverRadius: 5 },
-        { label: "MK Party", data: mkSeries, borderColor: CHART_COLORS.warning, backgroundColor: hexA(CHART_COLORS.warning, 0.14), tension: 0.3, fill: true, pointRadius: 2, pointHoverRadius: 5 }
+        { label: "ANC/MK Bloc", data: totalSeries, borderColor: CHART_COLORS.primary, backgroundColor: hexA(CHART_COLORS.primary, 0.16), tension: 0.3, fill: true, pointRadius: 2, pointHoverRadius: 5 }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
+      plugins: { legend: { display: false }, tooltip: { mode: "index" } },
+      interaction: { mode: "index", intersect: false },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
@@ -3048,7 +3043,6 @@ function goPage(n) {
    ========================================================================= */
 function renderChips() {
   const chips = [];
-  if (state.party !== "All") chips.push({ key: "party", val: state.party, label: "Party: " + state.party });
   if (state.type !== "All") chips.push({ key: "type", val: state.type, label: "Type: " + state.type });
   if (state.status !== "All") chips.push({ key: "status", val: state.status, label: "Status: " + state.status });
   if (state.scope !== "All") chips.push({ key: "scope", val: state.scope, label: "Scope: " + state.scope });
@@ -3062,7 +3056,6 @@ function renderChips() {
 }
 
 function clearFilter(key) {
-  if (key === "party") { state.party = "All"; document.getElementById("filterParty").value = "All"; setActivePartyPill("All"); }
   if (key === "type") { state.type = "All"; document.getElementById("filterType").value = "All"; }
   if (key === "status") { state.status = "All"; document.getElementById("filterStatus").value = "All"; }
   if (key === "scope") { state.scope = "All"; document.getElementById("filterScope").value = "All"; }
@@ -3080,10 +3073,9 @@ function clearFilter(key) {
 }
 
 function resetAllFilters() {
-  state.party = "All"; state.type = "All"; state.status = "All"; state.scope = "All";
+  state.type = "All"; state.status = "All"; state.scope = "All";
   state.search = ""; state.individualFilter = null;
   state.yearMin = 2000; state.yearMax = 2026; state.page = 1;
-  document.getElementById("filterParty").value = "All";
   document.getElementById("filterType").value = "All";
   document.getElementById("filterStatus").value = "All";
   document.getElementById("filterScope").value = "All";
@@ -3092,12 +3084,7 @@ function resetAllFilters() {
   document.getElementById("yearMax").value = 2026;
   document.getElementById("yearMinLabel").textContent = 2000;
   document.getElementById("yearMaxLabel").textContent = 2026;
-  setActivePartyPill("All");
   renderAll();
-}
-
-function setActivePartyPill(party) {
-  document.querySelectorAll(".pill").forEach(p => p.classList.toggle("active", p.dataset.party === party));
 }
 
 /* =========================================================================
@@ -3170,9 +3157,6 @@ function bindEvents() {
   document.getElementById("filterStatus").addEventListener("change", e => {
     state.status = e.target.value; state.page = 1; renderAll();
   });
-  document.getElementById("filterParty").addEventListener("change", e => {
-    state.party = e.target.value; setActivePartyPill(state.party); state.page = 1; renderAll();
-  });
   document.getElementById("filterScope").addEventListener("change", e => {
     state.scope = e.target.value; state.page = 1; renderAll();
   });
@@ -3191,15 +3175,6 @@ function bindEvents() {
     e.target.value = v;
     document.getElementById("yearMaxLabel").textContent = v;
     state.page = 1; renderAll();
-  });
-
-  document.querySelectorAll(".pill").forEach(p => {
-    p.addEventListener("click", () => {
-      state.party = p.dataset.party;
-      document.getElementById("filterParty").value = state.party;
-      setActivePartyPill(state.party);
-      state.page = 1; renderAll();
-    });
   });
 
   document.querySelectorAll("th[data-sort]").forEach(th => {
@@ -3256,17 +3231,20 @@ function setupUX() {
     toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
 
-  // Reveal-on-scroll for cards and panels.
+  // Reveal-on-scroll for decorative cards only — never gate primary
+  // content (the table, methodology) behind an animation.
   const targets = document.querySelectorAll(
-    ".summary-card, .chart-card, .timeline-item, .instab-stat, .table-wrap, .methodology, .hero-promise"
+    ".summary-card, .chart-card, .timeline-item, .instab-stat, .hero-promise"
   );
   if ("IntersectionObserver" in window) {
     const io = new IntersectionObserver((entries) => {
       entries.forEach(en => {
         if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
       });
-    }, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
+    }, { threshold: 0.05, rootMargin: "0px 0px -30px 0px" });
     targets.forEach(t => { t.classList.add("reveal"); io.observe(t); });
+    // Safety net: if anything is still hidden after 1.6s, force-reveal it.
+    setTimeout(() => targets.forEach(t => t.classList.add("in")), 1600);
   }
 }
 
